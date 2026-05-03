@@ -354,21 +354,17 @@ class Trainer:
         # Prepare batch (includes sharding for multi-device)
         prepared_batch = self._prepare_batch(batch)
 
+        # Generate dropout RNGs
+        dropout_rngs = self._generate_dropout_rngs()
+
         # Execute compiled train step
-        if self.num_devices == 1:
-            # Single device
-            metrics = self._train_step_fn(self.state, prepared_batch)
-            self.state = metrics["state"]
-            return {k: v for k, v in metrics.items() if k != "state"}
-        # Multi-device
-        metrics = self._train_step_fn(self.state, prepared_batch)
-        self.state = metrics["state"]
-        # Unreplicate metrics
-        return {
-            k: self.unreplicate(v) if k != "state" else v
-            for k, v in metrics.items()
-            if k != "state"
-        }
+        self.state, metrics = self._train_step_fn(self.state, prepared_batch, dropout_rngs)
+
+        # Unreplicate metrics if multi-device
+        if self.num_devices > 1:
+            metrics = {k: self.unreplicate(v) for k, v in metrics.items()}
+
+        return metrics
 
     # ========== Evaluation ==========
 

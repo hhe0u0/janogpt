@@ -77,7 +77,7 @@ class TestTrainerInit:
 
         evaluator = DatasetEvaluator(
             data_loader=dummy_dataloader,
-            eval_iters=2,
+            num_batches=2,
             name="test",
         )
 
