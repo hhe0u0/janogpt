@@ -38,8 +38,17 @@ def generate(
     generated = list(prompt_tokens)
 
     for _ in range(max_new_tokens):
+        # Handle empty sequence (first token generation)
+        if len(generated) == 0:
+            # Use a dummy token for first forward pass, then ignore output
+            # Just sample from uniform distribution over vocabulary
+            rng_key, sample_key = jax.random.split(rng_key)
+            next_token = jax.random.randint(sample_key, (), 0, 50257)  # Assuming GPT2 vocab
+            generated.append(int(next_token))
+            continue
+
         # Forward pass with current sequence
-        input_batch = jnp.array([generated])  # (1, current_len)
+        input_batch = jnp.array([generated], dtype=jnp.int32)  # (1, current_len)
         logits = model.apply(
             {'params': params},
             input_batch,

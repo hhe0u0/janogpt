@@ -52,7 +52,7 @@ class TestGeneration:
 
         # Should return prompt + new tokens
         assert len(generated) == len(prompt_tokens) + 5
-        assert generated[:len(prompt_tokens)] == prompt_tokens
+        assert list(generated[:len(prompt_tokens)]) == prompt_tokens
 
     def test_generate_respects_max_new_tokens(self, tiny_model_and_params):
         """Test generation stops at max_new_tokens."""
@@ -131,7 +131,7 @@ class TestGeneration:
         )
 
         # Should produce same output (greedy decoding)
-        assert gen1 == gen2
+        assert list(gen1) == list(gen2)
 
     def test_generate_deterministic_with_same_seed(self, tiny_model_and_params):
         """Test generation is deterministic with same RNG."""
@@ -156,7 +156,7 @@ class TestGeneration:
             rng_key=jax.random.key(42),
         )
 
-        assert gen1 == gen2
+        assert list(gen1) == list(gen2)
 
     def test_generate_different_with_different_seed(self, tiny_model_and_params):
         """Test generation differs with different RNG."""
@@ -182,7 +182,7 @@ class TestGeneration:
         )
 
         # Should differ (with high probability)
-        assert gen1 != gen2
+        assert list(gen1) != list(gen2)
 
     def test_generate_handles_empty_prompt(self, tiny_model_and_params):
         """Test generation works with empty prompt."""

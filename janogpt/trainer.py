@@ -350,6 +350,28 @@ class Trainer:
             )
             print(f"Using pmap compilation for {self.num_devices} devices")
 
+    def _train_step(self, batch: Dict[str, jnp.ndarray]):
+        """Unified train step that routes to compiled function."""
+        if not hasattr(self, '_train_step_fn'):
+            self._compile_train_step()
+
+        # Prepare batch (includes sharding for multi-device)
+        prepared_batch = self._prepare_batch(batch)
+
+        # Execute compiled train step
+        if self.num_devices == 1:
+            # Single device
+            metrics = self._train_step_fn(self.state, prepared_batch)
+            self.state = metrics['state']
+            return {k: v for k, v in metrics.items() if k != 'state'}
+        else:
+            # Multi-device
+            metrics = self._train_step_fn(self.state, prepared_batch)
+            self.state = metrics['state']
+            # Unreplicate metrics
+            return {k: self.unreplicate(v) if k != 'state' else v
+                    for k, v in metrics.items() if k != 'state'}
+
     # ========== Evaluation ==========
 
     def _eval_step_single(
@@ -382,17 +404,29 @@ class Trainer:
         loss = jax.lax.pmean(loss, axis_name='devices')
         return {'eval_loss': loss, 'eval_perplexity': jnp.exp(loss)}
 
-    def evaluate(self, eval_loader: Iterator, step = None) -> Dict[str, float]:
+    def _eval_step(self, batch: Dict[str, jnp.ndarray]):
+        """Unified eval step that routes to single or multi device."""
+        if self.num_devices == 1:
+            metrics = self._eval_step_single(self.state, batch)
+            return metrics['eval_loss']
+        else:
+            metrics = self._eval_step_multi(self.state, batch)
+            return self.unreplicate(metrics['eval_loss'])
+
+    def evaluate(self, eval_loader: Iterator, step = None, eval_iters = None) -> Dict[str, float]:
         """
         Run evaluation on validation set.
 
         Args:
             eval_loader: Iterator yielding validation batches
             step: Current training step (for logging)
+            eval_iters: Number of batches to evaluate (overrides config)
 
         Returns:
             dict of evaluation metrics
         """
+        if eval_iters is None:
+            eval_iters = self.config.eval_iters
         # Compile eval step if not done yet
         if not hasattr(self, '_eval_step_fn'):
             if self.num_devices == 1:
@@ -407,7 +441,7 @@ class Trainer:
         num_batches = 0
 
         for i, batch in enumerate(eval_loader):
-            if i >= self.config.eval_iters:
+            if i >= eval_iters:
                 break
 
             # Convert to JAX arrays

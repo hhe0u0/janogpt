@@ -77,7 +77,7 @@ class TestTrainerInit:
         from janogpt.logger import DatasetEvaluator
 
         evaluator = DatasetEvaluator(
-            dataloader=dummy_dataloader,
+            data_loader=dummy_dataloader,
             eval_iters=2,
             name="test",
         )
@@ -224,8 +224,11 @@ class TestEvaluation:
         """Test full evaluation over multiple batches."""
         trainer = Trainer(tiny_model, tiny_config, seed=42)
 
-        eval_loss = trainer.evaluate(dummy_dataloader, eval_iters=3)
+        eval_metrics = trainer.evaluate(dummy_dataloader, eval_iters=3)
 
+        assert isinstance(eval_metrics, dict)
+        assert 'eval/loss' in eval_metrics
+        eval_loss = eval_metrics['eval/loss']
         assert isinstance(eval_loss, float)
         assert jnp.isfinite(eval_loss)
         assert eval_loss > 0
