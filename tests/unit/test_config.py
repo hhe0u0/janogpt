@@ -18,7 +18,7 @@ class TestConfigDefaults:
         assert config.emb_dim > 0
         assert config.num_heads > 0
         assert config.seq_len > 0
-        assert config.vocab_size > 0
+        assert config.voc_size > 0
 
         # Training hyperparameters
         assert config.learning_rate > 0

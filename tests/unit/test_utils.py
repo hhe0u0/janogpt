@@ -15,19 +15,19 @@ class TestDummyDataLoader:
         loader = DummyDataLoader(
             batch_size=4,
             seq_len=16,
-            vocab_size=256,
+            voc_size=256,
         )
 
         assert loader.batch_size == 4
         assert loader.seq_len == 16
-        assert loader.vocab_size == 256
+        assert loader.voc_size == 256
 
     def test_dummy_dataloader_yields_correct_shape(self):
         """Test DummyDataLoader yields correct batch shape."""
         loader = DummyDataLoader(
             batch_size=4,
             seq_len=16,
-            vocab_size=256,
+            voc_size=256,
         )
 
         batch = next(iter(loader))
@@ -40,7 +40,7 @@ class TestDummyDataLoader:
         loader = DummyDataLoader(
             batch_size=4,
             seq_len=16,
-            vocab_size=256,
+            voc_size=256,
         )
 
         batch = next(iter(loader))
@@ -54,7 +54,7 @@ class TestDummyDataLoader:
         loader = DummyDataLoader(
             batch_size=4,
             seq_len=16,
-            vocab_size=256,
+            voc_size=256,
         )
 
         batch1 = next(iter(loader))

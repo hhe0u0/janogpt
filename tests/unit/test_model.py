@@ -16,7 +16,7 @@ def tiny_config():
         emb_dim=64,
         num_heads=2,
         seq_len=16,
-        vocab_size=256,
+        voc_size=256,
     )
 
 
@@ -29,7 +29,7 @@ def gpt2_config():
         emb_dim=768,
         num_heads=12,
         seq_len=1024,
-        vocab_size=50304,
+        voc_size=50304,
     )
 
 
@@ -54,7 +54,7 @@ class TestGPTModel:
         logits = model.apply({"params": params}, x, inference=True)
 
         # Check shape
-        assert logits.shape == (2, tiny_config.seq_len, tiny_config.vocab_size)
+        assert logits.shape == (2, tiny_config.seq_len, tiny_config.voc_size)
 
     def test_dynamic_sequence_length(self, tiny_config):
         """Test model handles variable sequence lengths."""
@@ -70,7 +70,7 @@ class TestGPTModel:
         x_short = jnp.zeros((1, seq_len), dtype=jnp.uint16)
         logits = model.apply({"params": params}, x_short, inference=True)
 
-        assert logits.shape == (1, seq_len, tiny_config.vocab_size)
+        assert logits.shape == (1, seq_len, tiny_config.voc_size)
 
     def test_param_count_tiny(self, tiny_config):
         """Test parameter counting for tiny model."""
@@ -120,7 +120,7 @@ class TestGPTModel:
 
         # Logits at position i should only depend on positions 0..i
         # This is hard to test directly, but we can verify shape is correct
-        assert logits.shape == (1, tiny_config.seq_len, tiny_config.vocab_size)
+        assert logits.shape == (1, tiny_config.seq_len, tiny_config.voc_size)
 
 
 class TestConfig:
@@ -134,7 +134,7 @@ class TestConfig:
         assert config.emb_dim > 0
         assert config.num_heads > 0
         assert config.seq_len > 0
-        assert config.vocab_size > 0
+        assert config.voc_size > 0
 
     def test_config_to_dict(self, gpt2_config):
         """Test config serialization."""

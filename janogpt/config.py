@@ -16,7 +16,7 @@ class Config:
     num_heads: int = 12
     seq_len: int = 1024
     epsilon: float = 1e-6
-    vocab_size: int = 50304
+    voc_size: int = 50304
 
     # Optimizer
     learning_rate: float = 6e-4
@@ -135,7 +135,7 @@ class Config:
                 "num_heads": self.num_heads,
                 "seq_len": self.seq_len,
                 "epsilon": self.epsilon,
-                "vocab_size": self.vocab_size,
+                "voc_size": self.voc_size,
             },
             "optimizer": {
                 "learning_rate": self.learning_rate,
@@ -189,7 +189,7 @@ class Config:
         lines.append(
             f"    blocks={self.num_blocks}, emb_dim={self.emb_dim}, heads={self.num_heads}"
         )
-        lines.append(f"    seq_len={self.seq_len}, vocab={self.vocab_size}")
+        lines.append(f"    seq_len={self.seq_len}, vocab={self.voc_size}")
         lines.append("  Training:")
         lines.append(f"    max_steps={self.max_steps}, lr={self.learning_rate}")
         lines.append(

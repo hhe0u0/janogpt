@@ -7,7 +7,7 @@
     "emb_dim": 64,
     "num_heads": 2,
     "seq_len": 32,
-    "vocab_size": 256
+    "voc_size": 256
   },
 
   "optimizer": {

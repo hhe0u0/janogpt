@@ -17,7 +17,7 @@ def tiny_config():
         emb_dim=64,
         num_heads=2,
         seq_len=16,
-        vocab_size=256,
+        voc_size=256,
         max_steps=10,
         micro_batch_size=2,
         gradient_accumulation_steps=2,
@@ -40,7 +40,7 @@ def dummy_dataloader(tiny_config):
     return DummyDataLoader(
         batch_size=tiny_config.micro_batch_size * tiny_config.gradient_accumulation_steps,
         seq_len=tiny_config.seq_len,
-        vocab_size=tiny_config.vocab_size,
+        voc_size=tiny_config.voc_size,
     )
 
 
@@ -135,7 +135,7 @@ class TestLearningRateSchedule:
             emb_dim=64,
             num_heads=2,
             seq_len=16,
-            vocab_size=256,
+            voc_size=256,
             max_steps=10,
             learning_rate=1e-3,
             use_lr_schedule=False,

@@ -17,7 +17,7 @@ def tiny_config():
         emb_dim=64,
         num_heads=2,
         seq_len=32,
-        vocab_size=256,
+        voc_size=256,
     )
 
 
@@ -223,7 +223,7 @@ class TestGeneration:
 class TestGenerationEdgeCases:
     """Test edge cases in generation."""
 
-    def test_generate_respects_vocab_size(self, tiny_model_and_params, tiny_config):
+    def test_generate_respects_voc_size(self, tiny_model_and_params, tiny_config):
         """Test all generated tokens are within vocabulary."""
         model, params = tiny_model_and_params
 
@@ -240,7 +240,7 @@ class TestGenerationEdgeCases:
 
         # All tokens should be valid
         for token in generated:
-            assert 0 <= token < tiny_config.vocab_size
+            assert 0 <= token < tiny_config.voc_size
 
     def test_generate_with_temperature_zero(self, tiny_model_and_params):
         """Test generation with very low temperature (greedy)."""

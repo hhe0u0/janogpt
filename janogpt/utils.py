@@ -21,7 +21,7 @@ class DummyDataLoader(BaseDataLoader):
         self,
         batch_size: int,
         seq_len: int,
-        vocab_size: int,
+        voc_size: int,
         num_batches: int = 1,
         seed: int = 42,
     ):
@@ -29,20 +29,20 @@ class DummyDataLoader(BaseDataLoader):
         Args:
             batch_size: Batch size
             seq_len: Sequence length
-            vocab_size: Vocabulary size
+            voc_size: Vocabulary size
             num_batches: Number of batches to generate
             seed: Random seed
         """
         self.batch_size = batch_size
         self.seq_len = seq_len
-        self.vocab_size = vocab_size
+        self.voc_size = voc_size
         self.num_batches = num_batches
         self.rng = np.random.RandomState(seed)
 
         # Pre-generate all batches
         self.batches = []
         for _ in range(num_batches):
-            batch = self.rng.randint(0, vocab_size, size=(batch_size, seq_len), dtype=np.int32)
+            batch = self.rng.randint(0, voc_size, size=(batch_size, seq_len), dtype=np.int32)
             self.batches.append({"input_ids": batch})
 
     def __iter__(self) -> Iterator[Dict[str, np.ndarray]]:
@@ -97,7 +97,7 @@ class FileDataLoader(BaseDataLoader):
         if meta_file.exists():
             with open(meta_file, "rb") as f:
                 self.meta = pickle.load(f)
-            print(f"Metadata: vocab_size={self.meta.get('vocab_size', 'unknown')}")
+            print(f"Metadata: voc_size={self.meta.get('vocab_size', 'unknown')}")
         else:
             self.meta = {}
 

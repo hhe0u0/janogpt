@@ -88,7 +88,7 @@ class Emb(nn.Module):
         pos = jnp.arange(0, T)[None]  # Position indices: (1, T)
         # IMPORTANT: Create wte before wpe to match HuggingFace naming
         # Embed_0 = wte (token embeddings), Embed_1 = wpe (position embeddings)
-        wte = nn.Embed(self.config.vocab_size, self.config.emb_dim)  # Token embeddings
+        wte = nn.Embed(self.config.voc_size, self.config.emb_dim)  # Token embeddings
         wpe = nn.Embed(self.config.seq_len, self.config.emb_dim)  # Position embeddings
         tkn_emb = wte(tkn)
         pos_emb = wpe(pos)

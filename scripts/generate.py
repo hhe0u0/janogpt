@@ -37,7 +37,7 @@ def load_pretrained():
 
     # Config for HF GPT2
     config = Config(
-        voc_size=50257,  # HF vocab size
+        voc_size=50257,  # HF vocab size (not padded like our trained model)
         num_blocks=12,
         emb_dim=768,
         num_heads=12,
