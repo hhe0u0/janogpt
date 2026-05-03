@@ -43,10 +43,12 @@ class TestConfigSerialization:
         config_dict = config.to_dict()
 
         assert isinstance(config_dict, dict)
-        assert config_dict['num_blocks'] == 6
-        assert config_dict['emb_dim'] == 384
-        assert config_dict['num_heads'] == 6
-        assert config_dict['learning_rate'] == 3e-4
+        assert 'model' in config_dict
+        assert config_dict['model']['num_blocks'] == 6
+        assert config_dict['model']['emb_dim'] == 384
+        assert config_dict['model']['num_heads'] == 6
+        assert 'optimizer' in config_dict
+        assert config_dict['optimizer']['learning_rate'] == 3e-4
 
     def test_from_json(self, tmp_path):
         """Test loading config from JSON file."""

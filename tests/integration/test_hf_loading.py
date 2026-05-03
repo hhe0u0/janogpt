@@ -20,7 +20,7 @@ def gpt2_config():
         emb_dim=768,
         num_heads=12,
         seq_len=1024,
-        voc_size=50257,  # CRITICAL: HF uses 50257, not 50304
+        vocab_size=50257,  # CRITICAL: HF uses 50257, not 50304
     )
 
 

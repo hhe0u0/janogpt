@@ -16,7 +16,7 @@ def tiny_config():
         emb_dim=64,
         num_heads=2,
         seq_len=16,
-        voc_size=256,
+        vocab_size=256,
     )
 
 
@@ -29,7 +29,7 @@ def gpt2_config():
         emb_dim=768,
         num_heads=12,
         seq_len=1024,
-        voc_size=50304,
+        vocab_size=50304,
     )
 
 

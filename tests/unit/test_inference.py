@@ -17,7 +17,7 @@ def tiny_config():
         emb_dim=64,
         num_heads=2,
         seq_len=32,
-        voc_size=256,
+        vocab_size=256,
     )
 
 

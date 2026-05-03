@@ -308,7 +308,53 @@ params = restored['state'].params
 # Use for inference or resume training
 ```
 
-## Testing
+## Development & Code Quality
+
+### Static Analysis
+
+Install development dependencies:
+```bash
+pip install -e ".[dev]"
+pre-commit install  # Setup git hooks
+```
+
+**Run checks manually:**
+```bash
+# Format code (auto-fix)
+make format
+
+# Lint code (report issues)
+make lint
+
+# Type checking
+make typecheck
+
+# Security checks
+make security
+
+# Run all checks
+make check
+
+# Run tests
+make test
+
+# Everything (format + check + test)
+make all
+```
+
+**Pre-commit hooks** (automatic on git commit):
+- Ruff formatting and linting
+- MyPy type checking
+- Bandit security scanning
+- Trailing whitespace, large files, etc.
+
+**CI/CD:** GitHub Actions runs checks on all PRs:
+- Lint & format verification
+- Type checking (mypy)
+- Security scanning (bandit)
+- Tests on Python 3.9, 3.10, 3.11
+
+### Testing
 
 ```bash
 # Run all tests
