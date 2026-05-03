@@ -234,6 +234,71 @@ class Trainer:
 
     # ========== Single Device Training (JIT) ==========
 
+    def _train_step_single_verbose(
+        self,
+        state: train_state.TrainState,
+        batches: Dict[str, jnp.ndarray],  # (accum_steps, micro_batch, seq)
+        dropout_rngs: jax.random.PRNGKey,  # (accum_steps, 2)
+    ):
+        """
+        Verbose training step for first step only (NOT JIT compiled).
+        Shows progress for each micro-batch during gradient accumulation.
+        """
+        print(f"  - Processing {self.config.gradient_accumulation_steps} gradient accumulation steps...")
+
+        # Initialize accumulators
+        zero_grads = jax.tree_util.tree_map(jnp.zeros_like, state.params)
+        acc_grads = zero_grads
+        acc_loss = jnp.array(0.0)
+
+        # Manual loop (no lax.scan) so we can print progress
+        for i in range(self.config.gradient_accumulation_steps):
+            micro_batch = jax.tree_util.tree_map(lambda x: x[i], batches)
+            rng = dropout_rngs[i]
+
+            # Compute loss and gradients for this micro-batch
+            loss, grads = jax.value_and_grad(self.compute_loss)(
+                state.params, micro_batch, rng, training=True
+            )
+
+            # Accumulate
+            acc_grads = jax.tree_util.tree_map(lambda a, g: a + g, acc_grads, grads)
+            acc_loss = acc_loss + loss
+
+            # Print progress every 10% or every 10 steps
+            if (i + 1) % max(1, self.config.gradient_accumulation_steps // 10) == 0:
+                progress = (i + 1) / self.config.gradient_accumulation_steps * 100
+                print(f"    [{i+1}/{self.config.gradient_accumulation_steps}] "
+                      f"{progress:.0f}% complete - loss: {float(loss):.4f}")
+
+        print(f"  ✓ All micro-batches processed")
+
+        # Average gradients
+        acc_grads = jax.tree_util.tree_map(
+            lambda g: g / self.config.gradient_accumulation_steps, acc_grads
+        )
+        acc_loss = acc_loss / self.config.gradient_accumulation_steps
+
+        # Apply gradients
+        print(f"  - Applying gradients...")
+        state = state.apply_gradients(grads=acc_grads)
+
+        # Compute metrics
+        grad_norm = optax.global_norm(acc_grads)
+        param_norm = optax.global_norm(state.params)
+        grad_to_param = grad_norm / (param_norm + 1e-8)
+
+        metrics = {
+            "loss": acc_loss,
+            "perplexity": jnp.exp(acc_loss),
+            "grad_norm": grad_norm,
+            "param_norm": param_norm,
+            "grad_to_param_ratio": grad_to_param,
+            "learning_rate": self.get_learning_rate(state.step),
+        }
+
+        return state, metrics
+
     def _train_step_single(
         self,
         state: train_state.TrainState,
@@ -581,21 +646,41 @@ class Trainer:
 
             # Train step
             if step == 1:
-                print(f"[step {step}] Starting first train step (JIT compilation will occur)...")
-                print(f"  - Compiling training step for {self.num_devices} device(s)...")
+                print(f"[step {step}] Starting first train step...")
                 print(f"  - Effective batch: {self.effective_batch_size} seqs, {self.effective_batch_tokens/1e3:.0f}K tokens")
-                print(f"  - This may take 1-3 minutes depending on model size and device...")
+                print(f"  - Running verbose (non-JIT) version to show progress...")
                 step_start = time.perf_counter()
 
-            self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
+                # Use verbose non-JIT version for first step
+                if self.num_devices == 1:
+                    self.state, metrics = self._train_step_single_verbose(
+                        self.state, batch_jax, dropout_rngs
+                    )
+                else:
+                    # For multi-device, still need to use pmap but show message
+                    print(f"  - Note: Multi-device uses pmap, limited progress visibility")
+                    print(f"  - Compiling for {self.num_devices} devices (this will take 1-3 min)...")
+                    self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
 
-            if step == 1:
                 step_time = time.perf_counter() - step_start
                 print(f"[step {step}] ✓ First step complete!")
-                print(f"  - Total time: {step_time:.1f}s (JIT compile + execution)")
-                print(f"  - Loss: {metrics['loss']:.4f}")
-                print(f"  - Subsequent steps will be much faster (~{step_time/10:.1f}s expected)")
+                print(f"  - Total time: {step_time:.1f}s")
+                print(f"  - Loss: {float(metrics['loss']) if self.num_devices == 1 else float(metrics['loss'][0]):.4f}")
+                print(f"  - Now compiling optimized JIT version for subsequent steps...")
+                print(f"  - This will take another 1-2 minutes...")
+
+                # Now compile the fast JIT version for subsequent steps
+                jit_start = time.perf_counter()
+                if self.num_devices == 1:
+                    # Compile JIT version with dummy call
+                    self._train_step_fn(self.state, batch_jax, dropout_rngs)
+                jit_time = time.perf_counter() - jit_start
+                print(f"  ✓ JIT compilation complete ({jit_time:.1f}s)")
+                print(f"  - Subsequent steps will be much faster (~{(step_time+jit_time)/20:.1f}s expected)")
                 print()
+            else:
+                # Normal JIT-compiled step for all subsequent steps
+                self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
 
             # Extract metrics (unreplicate if multi-device)
             if self.num_devices > 1:
