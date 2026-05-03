@@ -1,0 +1,50 @@
+{
+  "_comment": "Tiny config for fast unit tests",
+
+  "model": {
+    "dropout_prob": 0.0,
+    "num_blocks": 2,
+    "emb_dim": 64,
+    "num_heads": 2,
+    "seq_len": 32,
+    "voc_size": 256
+  },
+
+  "optimizer": {
+    "learning_rate": 1e-3,
+    "use_lr_schedule": false,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "grad_clip": 1.0,
+    "weight_decay": 0.0
+  },
+
+  "training": {
+    "max_steps": 5,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 1,
+    "seed": 42
+  },
+
+  "data": {
+    "dataloader_class": "DummyDataLoader"
+  },
+
+  "logging": {
+    "eval_interval": 3,
+    "eval_iters": 2,
+    "log_interval": 1
+  },
+
+  "checkpointing": {
+    "save_interval": 5,
+    "output_dir": "output_test_tiny",
+    "resume_from_checkpoint": null
+  },
+
+  "wandb": {
+    "enabled": false,
+    "project": "janogpt-test",
+    "run_name": "test-tiny"
+  }
+}

@@ -1,0 +1,106 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "janogpt"
+version = "0.1.0"
+description = "A GPT-2 implementation in JAX with educational focus"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "hhe0u0", email = "cipher0u0@gmail.com"}
+]
+keywords = ["gpt2", "transformer", "jax", "language-model", "deep-learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "jax>=0.4.20",
+    "jaxlib>=0.4.20",
+    "flax>=0.8.0",
+    "optax>=0.1.7",
+    "orbax-checkpoint>=0.5.0",
+    "numpy>=1.24.0",
+    "tiktoken>=0.5.0",
+    "tqdm>=4.65.0",
+    "wandb>=0.16.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+]
+data = [
+    "kagglehub>=0.2.0",
+]
+huggingface = [
+    "transformers>=4.35.0",
+    "torch>=2.1.0",  # Required for HF model loading
+]
+
+[project.urls]
+Homepage = "https://github.com/hhe0u0/janogpt"
+Repository = "https://github.com/hhe0u0/janogpt"
+Issues = "https://github.com/hhe0u0/janogpt/issues"
+
+[project.scripts]
+janogpt-train = "scripts.train:main"
+janogpt-generate = "scripts.generate:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["janogpt*", "scripts*", "pretrained*"]
+exclude = ["tests*", "notebooks*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | build
+  | dist
+  | \.eggs
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--cov=janogpt",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
