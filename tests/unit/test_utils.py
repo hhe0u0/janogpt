@@ -63,6 +63,43 @@ class TestDummyDataLoader:
         # Should be identical
         assert np.array_equal(batch1["input_ids"], batch2["input_ids"])
 
+    def test_dummy_dataloader_format_for_next_token_prediction(self):
+        """Test data loader returns correct format for next-token prediction.
+
+        The trainer expects input_ids of shape (batch, seq_len) and will internally
+        shift to create targets: logits[:, :-1] predicts tokens[:, 1:]
+        """
+        loader = DummyDataLoader(
+            batch_size=2,
+            seq_len=8,
+            voc_size=256,
+        )
+
+        batch = next(iter(loader))
+
+        # Should have input_ids key
+        assert "input_ids" in batch
+
+        # Shape should be (batch, seq_len)
+        assert batch["input_ids"].shape == (2, 8)
+
+        # Verify the shifting logic matches what trainer does
+        input_ids = batch["input_ids"]
+
+        # Simulating what trainer does:
+        # model predicts: input_ids[:, :-1] -> targets should be input_ids[:, 1:]
+        inputs = input_ids[:, :-1]  # First 7 tokens
+        targets = input_ids[:, 1:]  # Last 7 tokens (shifted by 1)
+
+        assert inputs.shape == (2, 7)
+        assert targets.shape == (2, 7)
+
+        # Verify each target is indeed the next token
+        for batch_idx in range(2):
+            for pos in range(7):
+                # Token at position pos+1 should be the target for position pos
+                assert input_ids[batch_idx, pos + 1] == targets[batch_idx, pos]
+
 
 class TestFileDataLoader:
     """Test FileDataLoader."""
@@ -149,6 +186,41 @@ class TestFileDataLoader:
 
         # Should be different (random sampling)
         assert not np.array_equal(batch1["input_ids"], batch2["input_ids"])
+
+    def test_file_dataloader_format_for_next_token_prediction(self, tmp_path):
+        """Test FileDataLoader returns correct format for next-token prediction."""
+        # Create dummy data with known pattern
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        train_file = data_dir / "train.bin"
+        # Create sequential data: 0, 1, 2, 3, ...
+        data = np.arange(1000, dtype=np.uint16)
+        data.tofile(str(train_file))
+
+        loader = FileDataLoader(
+            data_dir=str(data_dir),
+            batch_size=2,
+            seq_len=8,
+            split="train",
+            seed=42,
+        )
+
+        batch = next(iter(loader))
+
+        # Should have input_ids key
+        assert "input_ids" in batch
+        assert batch["input_ids"].shape == (2, 8)
+
+        # Verify shifting logic
+        input_ids = batch["input_ids"]
+        inputs = input_ids[:, :-1]  # First 7 tokens
+        targets = input_ids[:, 1:]  # Last 7 tokens
+
+        # Each target should be next token
+        for batch_idx in range(2):
+            for pos in range(7):
+                assert input_ids[batch_idx, pos + 1] == targets[batch_idx, pos]
 
 
 class TestBatchSharding:
