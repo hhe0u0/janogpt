@@ -277,10 +277,15 @@ class Trainer:
 
         # Compute metrics
         grad_norm = optax.global_norm(acc_grads)
+        param_norm = optax.global_norm(state.params)
+        grad_to_param = grad_norm / (param_norm + 1e-8)
+
         metrics = {
             "loss": acc_loss,
             "perplexity": jnp.exp(acc_loss),
             "grad_norm": grad_norm,
+            "param_norm": param_norm,
+            "grad_to_param_ratio": grad_to_param,
             "learning_rate": self.get_learning_rate(state.step),
         }
 
@@ -338,10 +343,15 @@ class Trainer:
         state = state.apply_gradients(grads=acc_grads)
 
         grad_norm = optax.global_norm(acc_grads)
+        param_norm = optax.global_norm(state.params)
+        grad_to_param = grad_norm / (param_norm + 1e-8)
+
         metrics = {
             "loss": acc_loss,
             "perplexity": jnp.exp(acc_loss),
             "grad_norm": grad_norm,
+            "param_norm": param_norm,
+            "grad_to_param_ratio": grad_to_param,
             "learning_rate": self.get_learning_rate(state.step),
         }
 
@@ -594,8 +604,12 @@ class Trainer:
                     "train/loss_ema": loss_ema,
                     "train/perplexity": metrics["perplexity"],
                     "train/grad_norm": metrics["grad_norm"],
+                    "train/param_norm": metrics["param_norm"],
+                    "train/grad_to_param_ratio": metrics["grad_to_param_ratio"],
                     "train/learning_rate": metrics["learning_rate"],
                     "train/tokens_per_sec": tokens_per_sec,
+                    "system/step_time_ms": (elapsed / step) * 1000,
+                    "system/steps_per_sec": step / elapsed,
                     "step": step,
                 }
 

@@ -21,16 +21,19 @@ class DatasetEvaluator(BaseEvaluator):
         data_loader: DataLoader,
         num_batches: int,
         name: str = "val",
+        model=None,  # Optional: for computing additional metrics
     ):
         """
         Args:
             data_loader: DataLoader for validation data
             num_batches: Number of batches to evaluate
             name: Name for this evaluator (for logging)
+            model: Optional model for computing logits-based metrics
         """
         self.data_loader = data_loader
         self.num_batches = num_batches
         self._name = name
+        self.model = model
 
     @property
     def name(self) -> str:
@@ -44,6 +47,9 @@ class DatasetEvaluator(BaseEvaluator):
     ) -> Dict[str, float]:
         """Compute average loss over validation batches."""
         losses = []
+        accuracies = []
+        confidences = []
+        entropies = []
 
         for _ in range(self.num_batches):
             batch = self.data_loader.get_batch()
@@ -53,13 +59,49 @@ class DatasetEvaluator(BaseEvaluator):
             loss = compute_loss_fn(state.params, batch_jax, None, training=False)
             losses.append(float(loss))
 
+            # Compute additional metrics if model is provided
+            if self.model is not None:
+                input_ids = batch_jax["input_ids"]
+
+                # Get logits
+                logits = self.model.apply(
+                    {"params": state.params}, input_ids, inference=True
+                )
+
+                # Compute next-token prediction accuracy
+                shift_logits = logits[:, :-1, :]  # (B, T-1, V)
+                shift_labels = input_ids[:, 1:]  # (B, T-1)
+                predictions = jnp.argmax(shift_logits, axis=-1)
+                accuracy = float((predictions == shift_labels).mean())
+                accuracies.append(accuracy)
+
+                # Compute average confidence (max probability)
+                probs = jax.nn.softmax(shift_logits, axis=-1)
+                max_probs = jnp.max(probs, axis=-1)
+                avg_confidence = float(max_probs.mean())
+                confidences.append(avg_confidence)
+
+                # Compute entropy (measure of uncertainty)
+                entropy = -jnp.sum(probs * jnp.log(probs + 1e-10), axis=-1).mean()
+                entropies.append(float(entropy))
+
         avg_loss = sum(losses) / len(losses)
         perplexity = jnp.exp(avg_loss)
 
-        return {
+        metrics = {
             f"{self.name}/loss": avg_loss,
             f"{self.name}/perplexity": float(perplexity),
         }
+
+        # Add optional metrics if computed
+        if accuracies:
+            metrics[f"{self.name}/accuracy"] = sum(accuracies) / len(accuracies)
+        if confidences:
+            metrics[f"{self.name}/confidence"] = sum(confidences) / len(confidences)
+        if entropies:
+            metrics[f"{self.name}/entropy"] = sum(entropies) / len(entropies)
+
+        return metrics
 
 
 # ========== Loggers ==========
