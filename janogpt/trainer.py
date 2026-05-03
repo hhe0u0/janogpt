@@ -57,9 +57,25 @@ class Trainer:
         self.rng = jax.random.key(seed)
 
         # Device detection
-        self.num_devices = jax.local_device_count()
+        available_devices = jax.local_device_count()
+        if config.num_devices is not None:
+            # Use specified number of devices
+            if config.num_devices > available_devices:
+                raise ValueError(
+                    f"Requested {config.num_devices} devices but only "
+                    f"{available_devices} available"
+                )
+            self.num_devices = config.num_devices
+            print(
+                f"Using {self.num_devices} of {available_devices} available "
+                f"{jax.devices()[0].platform.upper()} device(s)"
+            )
+        else:
+            # Auto-detect and use all devices
+            self.num_devices = available_devices
+            print(f"Detected {self.num_devices} {jax.devices()[0].platform.upper()} device(s)")
+
         self.device_type = jax.devices()[0].platform
-        print(f"Detected {self.num_devices} {self.device_type.upper()} device(s)")
 
         # Calculate effective batch size
         self.effective_batch_size = (

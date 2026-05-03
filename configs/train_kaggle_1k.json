@@ -20,8 +20,10 @@
   "training": {
     "max_steps": 1000,
     "micro_batch_size": 1,
-    "gradient_accumulation_steps": 512,
-    "_effective_batch_comment": "1 × 512 × 1 GPU × 1024 = 524,288 tokens ≈ 0.5M (same as before but single GPU)",
+    "gradient_accumulation_steps": 256,
+    "num_devices": 1,
+    "_effective_batch_comment": "1 × 256 × 1 GPU × 1024 = 262,144 tokens ≈ 0.25M (reduced for T4 memory)",
+    "_note": "Set num_devices=1 to use only 1 GPU. If you have 2 T4s and want to use both, set to 2 and reduce gradient_accumulation_steps to 128",
     "eval_interval": 100,
     "eval_iters": 10,
     "log_interval": 10,

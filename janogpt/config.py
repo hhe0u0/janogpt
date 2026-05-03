@@ -32,6 +32,7 @@ class Config:
     max_steps: int = 600000
     micro_batch_size: int = 4  # Per device
     gradient_accumulation_steps: int = 16
+    num_devices: Optional[int] = None  # Number of devices to use (None = auto-detect all)
     seed: int = 42
 
     # Evaluation & Logging
@@ -150,6 +151,7 @@ class Config:
                 "max_steps": self.max_steps,
                 "micro_batch_size": self.micro_batch_size,
                 "gradient_accumulation_steps": self.gradient_accumulation_steps,
+                "num_devices": self.num_devices,
                 "seed": self.seed,
             },
             "data": {
