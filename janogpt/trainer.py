@@ -613,12 +613,13 @@ class Trainer:
         keys = jax.random.split(base, self.config.gradient_accumulation_steps)
         return keys
 
-    def train(self, train_loader: Iterator):
+    def train(self, train_loader: Iterator, verbose_first_step: bool = False):
         """
         Main training loop.
 
         Args:
             train_loader: Iterator yielding training batches
+            verbose_first_step: If True, show detailed micro-batch progress for first step
         """
 
         # Load checkpoint if resuming
@@ -648,36 +649,51 @@ class Trainer:
             if step == 1:
                 print(f"[step {step}] Starting first train step...")
                 print(f"  - Effective batch: {self.effective_batch_size} seqs, {self.effective_batch_tokens/1e3:.0f}K tokens")
-                print(f"  - Running verbose (non-JIT) version to show progress...")
+
                 step_start = time.perf_counter()
 
-                # Use verbose non-JIT version for first step
-                if self.num_devices == 1:
+                # Use verbose non-JIT version for first step if requested
+                if verbose_first_step and self.num_devices == 1:
+                    print(f"  - Running verbose (non-JIT) version to show progress...")
                     self.state, metrics = self._train_step_single_verbose(
                         self.state, batch_jax, dropout_rngs
                     )
+
+                    step_time = time.perf_counter() - step_start
+                    print(f"[step {step}] ✓ First step complete!")
+                    print(f"  - Total time: {step_time:.1f}s")
+                    print(f"  - Loss: {float(metrics['loss']):.4f}")
+                    print(f"  - Now compiling optimized JIT version for subsequent steps...")
+                    print(f"  - This will take another 1-2 minutes...")
+
+                    # Now compile the fast JIT version for subsequent steps
+                    jit_start = time.perf_counter()
+                    self._train_step_fn(self.state, batch_jax, dropout_rngs)
+                    jit_time = time.perf_counter() - jit_start
+                    print(f"  ✓ JIT compilation complete ({jit_time:.1f}s)")
+                    print(f"  - Subsequent steps will be much faster (~{(step_time+jit_time)/20:.1f}s expected)")
+                    print()
                 else:
-                    # For multi-device, still need to use pmap but show message
-                    print(f"  - Note: Multi-device uses pmap, limited progress visibility")
-                    print(f"  - Compiling for {self.num_devices} devices (this will take 1-3 min)...")
+                    # Standard first step (with JIT compilation happening inside)
+                    if self.num_devices > 1:
+                        print(f"  - Compiling for {self.num_devices} devices (this will take 1-3 min)...")
+                        if verbose_first_step:
+                            print(f"  - Note: Multi-device uses pmap, no micro-batch progress available")
+                            print(f"  - Use --verbose with single GPU to see detailed progress")
+                    else:
+                        print(f"  - Compiling training step (this will take 1-3 min)...")
+                        if verbose_first_step:
+                            print(f"  - Tip: --verbose flag shows micro-batch progress for single GPU")
+
                     self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
 
-                step_time = time.perf_counter() - step_start
-                print(f"[step {step}] ✓ First step complete!")
-                print(f"  - Total time: {step_time:.1f}s")
-                print(f"  - Loss: {float(metrics['loss']) if self.num_devices == 1 else float(metrics['loss'][0]):.4f}")
-                print(f"  - Now compiling optimized JIT version for subsequent steps...")
-                print(f"  - This will take another 1-2 minutes...")
-
-                # Now compile the fast JIT version for subsequent steps
-                jit_start = time.perf_counter()
-                if self.num_devices == 1:
-                    # Compile JIT version with dummy call
-                    self._train_step_fn(self.state, batch_jax, dropout_rngs)
-                jit_time = time.perf_counter() - jit_start
-                print(f"  ✓ JIT compilation complete ({jit_time:.1f}s)")
-                print(f"  - Subsequent steps will be much faster (~{(step_time+jit_time)/20:.1f}s expected)")
-                print()
+                    step_time = time.perf_counter() - step_start
+                    print(f"[step {step}] ✓ First step complete!")
+                    print(f"  - Total time: {step_time:.1f}s (JIT compile + execution)")
+                    loss_val = float(metrics['loss']) if self.num_devices == 1 else float(metrics['loss'][0])
+                    print(f"  - Loss: {loss_val:.4f}")
+                    print(f"  - Subsequent steps will be much faster (~{step_time/10:.1f}s expected)")
+                    print()
             else:
                 # Normal JIT-compiled step for all subsequent steps
                 self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)

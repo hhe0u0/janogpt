@@ -25,6 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train JanoGPT")
     parser.add_argument("--config", type=str, required=True, help="Path to config JSON file")
     parser.add_argument("--no_wandb", action="store_true", help="Disable WandB logging")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed progress for first training step")
     return parser.parse_args()
 
 
@@ -99,7 +100,7 @@ def main():
 
     # Train
     try:
-        trainer.train(train_loader)
+        trainer.train(train_loader, verbose_first_step=args.verbose)
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user")
         trainer.save_checkpoint(int(trainer.state.step))
