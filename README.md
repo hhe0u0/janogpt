@@ -53,16 +53,29 @@ pip install -e ".[data]"
 # Install HuggingFace dependencies
 pip install -e ".[huggingface]"
 
-# Interactive mode - chat with GPT-2
+# Interactive mode - chat with GPT-2 (124M params)
 python scripts/generate.py --pretrained --interactive
+
+# Use larger models for better quality
+python scripts/generate.py --pretrained gpt2-medium --interactive  # 355M params
+python scripts/generate.py --pretrained gpt2-large --interactive   # 774M params
+python scripts/generate.py --pretrained gpt2-xl --interactive      # 1.5B params
 
 # Single prompt mode
 python scripts/generate.py \
-  --pretrained \
+  --pretrained gpt2-medium \
   --prompt "The meaning of life is" \
   --max_tokens 100 \
   --temperature 0.8
 ```
+
+**Available models:**
+- `gpt2` (default) - 124M parameters, fast, good quality
+- `gpt2-medium` - 355M parameters, better quality, slower
+- `gpt2-large` - 774M parameters, high quality, requires more memory
+- `gpt2-xl` - 1.5B parameters, best quality, requires 16GB+ GPU
+
+Model configuration (layers, dimensions) is **automatically detected** from the model name!
 
 **Interactive mode example:**
 ```
@@ -412,31 +425,41 @@ Load GPT-2 weights from HuggingFace and use immediately (no training required):
 
 ```bash
 # Install dependencies
-pip install transformers torch
+pip install -e ".[huggingface]"
 
-# Generate text with pretrained GPT-2
+# Use default GPT-2 (124M)
+python scripts/generate.py --pretrained --interactive
+
+# Use larger models - just specify the name!
+python scripts/generate.py --pretrained gpt2-medium --interactive   # 355M
+python scripts/generate.py --pretrained gpt2-large --interactive    # 774M
+python scripts/generate.py --pretrained gpt2-xl --interactive       # 1.5B
+
+# Single prompt mode
 python scripts/generate.py \
-  --pretrained \
+  --pretrained gpt2-medium \
   --prompt "The future of AI is" \
   --max_tokens 100
-
-# Interactive mode (recommended!)
-python scripts/generate.py --pretrained --interactive
 ```
 
-**What happens:**
-1. Downloads GPT-2 124M from HuggingFace (first time only, ~500MB)
-2. Automatically converts PyTorch weights to JAX format
-3. Ready to generate text immediately
-4. Weights cached locally for future use
+**What happens (fully automatic):**
+1. Auto-detects model configuration from model name
+   - Number of layers, embedding dimension, attention heads
+   - Vocabulary size, sequence length
+2. Downloads model from HuggingFace (first time only, ~500MB to 6GB)
+3. Automatically converts PyTorch weights to JAX format
+4. Ready to generate text immediately
+5. Weights cached locally for future use
 
 **Supported models:**
-- `gpt2` (124M parameters) - Default, good for most uses
-- `gpt2-medium` (355M) - Better quality, slower
-- `gpt2-large` (774M) - High quality, requires more memory
-- `gpt2-xl` (1.5B) - Best quality, requires 16GB+ GPU
+| Model | Parameters | Layers | Embed Dim | Use Case |
+|-------|-----------|--------|-----------|----------|
+| `gpt2` | 124M | 12 | 768 | Default, fast, good quality |
+| `gpt2-medium` | 355M | 24 | 1024 | Better quality, moderate speed |
+| `gpt2-large` | 774M | 36 | 1280 | High quality, slower |
+| `gpt2-xl` | 1.5B | 48 | 1600 | Best quality, requires GPU |
 
-To use larger models, modify `pretrained/huggingface/loader.py` and change the model name.
+**No manual configuration needed** - just specify the model name and everything is auto-configured!
 
 ## Loading Pretrained Weights
 

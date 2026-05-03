@@ -5,15 +5,22 @@ Text generation script for JanoGPT.
 Usage:
     # Interactive mode with pretrained GPT-2 (recommended!)
     python scripts/generate.py --pretrained --interactive
+    python scripts/generate.py --pretrained gpt2-medium --interactive
+    python scripts/generate.py --pretrained gpt2-large --interactive
+    python scripts/generate.py --pretrained gpt2-xl --interactive
 
     # Single prompt with pretrained GPT-2
     python scripts/generate.py --pretrained --prompt "Once upon a time"
+    python scripts/generate.py --pretrained gpt2-medium --prompt "Once upon a time"
 
     # Interactive mode with your trained checkpoint
     python scripts/generate.py --checkpoint output/checkpoints/step_10000 --interactive
 
     # Single prompt with your checkpoint
     python scripts/generate.py --checkpoint output/checkpoints/step_10000 --prompt "Hello, I am"
+
+Available pretrained models: gpt2 (124M), gpt2-medium (355M), gpt2-large (774M), gpt2-xl (1.5B)
+Model configuration is automatically detected and loaded.
 """
 
 import argparse
@@ -59,22 +66,104 @@ class Colors:
     BRIGHT_WHITE = "\033[97m"
 
 
-def load_pretrained():
-    """Load pretrained HuggingFace GPT2 weights."""
-    from pretrained.huggingface.loader import load_hf_gpt2_weights
+def get_hf_model_config(model_name: str):
+    """
+    Get model configuration from HuggingFace model name.
 
-    # Config for HF GPT2
+    Args:
+        model_name: One of 'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'
+
+    Returns:
+        Config object
+    """
+    # Model configurations
+    configs = {
+        "gpt2": {
+            "voc_size": 50257,
+            "num_blocks": 12,
+            "emb_dim": 768,
+            "num_heads": 12,
+            "seq_len": 1024,
+        },
+        "gpt2-medium": {
+            "voc_size": 50257,
+            "num_blocks": 24,
+            "emb_dim": 1024,
+            "num_heads": 16,
+            "seq_len": 1024,
+        },
+        "gpt2-large": {
+            "voc_size": 50257,
+            "num_blocks": 36,
+            "emb_dim": 1280,
+            "num_heads": 20,
+            "seq_len": 1024,
+        },
+        "gpt2-xl": {
+            "voc_size": 50257,
+            "num_blocks": 48,
+            "emb_dim": 1600,
+            "num_heads": 25,
+            "seq_len": 1024,
+        },
+    }
+
+    if model_name not in configs:
+        raise ValueError(
+            f"Unknown model '{model_name}'. Available: {', '.join(configs.keys())}"
+        )
+
+    model_config = configs[model_name]
+
+    # Create config
     config = Config(
-        voc_size=50257,  # HF vocab size (not padded like our trained model)
-        num_blocks=12,
-        emb_dim=768,
-        num_heads=12,
-        seq_len=1024,
-        dropout_prob=0.0,
+        voc_size=model_config["voc_size"],
+        num_blocks=model_config["num_blocks"],
+        emb_dim=model_config["emb_dim"],
+        num_heads=model_config["num_heads"],
+        seq_len=model_config["seq_len"],
+        dropout_prob=0.0,  # No dropout for inference
     )
 
+    return config
+
+
+def load_pretrained(model_name: str = "gpt2"):
+    """
+    Load pretrained HuggingFace GPT2 weights.
+
+    Args:
+        model_name: Model name ('gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl')
+
+    Returns:
+        tuple: (model, params, config)
+    """
+    from pretrained.huggingface.loader import load_hf_gpt2_weights
+
+    print(f"{Colors.CYAN}Loading {model_name} from HuggingFace...{Colors.RESET}")
+
+    # Auto-detect config from model name
+    config = get_hf_model_config(model_name)
+
+    # Calculate model size
+    params_count = (
+        config.num_blocks * (
+            # Attention: QKV + output projection
+            4 * config.emb_dim * config.emb_dim +
+            # MLP: two layers
+            2 * config.emb_dim * 4 * config.emb_dim
+        ) +
+        # Embeddings
+        config.voc_size * config.emb_dim +
+        config.seq_len * config.emb_dim
+    )
+    params_millions = params_count / 1_000_000
+
+    print(f"{Colors.DIM}Model: {config.num_blocks} layers, {config.emb_dim} dim, {config.num_heads} heads{Colors.RESET}")
+    print(f"{Colors.DIM}Parameters: ~{params_millions:.0f}M{Colors.RESET}")
+
     model = GPT(config)
-    params = load_hf_gpt2_weights(model, config)
+    params = load_hf_gpt2_weights(model, config, model_name)
 
     return model, params, config
 
@@ -136,7 +225,13 @@ def generate_streaming(model, params, prompt_tokens, max_new_tokens, temperature
 def main():
     parser = argparse.ArgumentParser(description="Generate text with JanoGPT")
     parser.add_argument("--checkpoint", type=str, help="Path to checkpoint directory")
-    parser.add_argument("--pretrained", action="store_true", help="Use pretrained HuggingFace GPT2")
+    parser.add_argument(
+        "--pretrained",
+        type=str,
+        nargs="?",
+        const="gpt2",
+        help="Use pretrained HuggingFace model (default: gpt2). Options: gpt2, gpt2-medium, gpt2-large, gpt2-xl",
+    )
     parser.add_argument("--prompt", type=str, default="Hello, I am", help="Text prompt")
     parser.add_argument("--max_tokens", type=int, default=50, help="Maximum tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.8, help="Sampling temperature")
@@ -148,18 +243,21 @@ def main():
     args = parser.parse_args()
 
     if not args.checkpoint and not args.pretrained:
-        print("Error: Must specify either --checkpoint or --pretrained")
+        print(f"{Colors.RED}Error: Must specify either --checkpoint or --pretrained{Colors.RESET}")
+        print(f"{Colors.DIM}Examples:{Colors.RESET}")
+        print(f"{Colors.DIM}  python scripts/generate.py --pretrained --interactive{Colors.RESET}")
+        print(f"{Colors.DIM}  python scripts/generate.py --pretrained gpt2-medium --interactive{Colors.RESET}")
+        print(f"{Colors.DIM}  python scripts/generate.py --checkpoint output/checkpoints/step_10000 --interactive{Colors.RESET}")
         return 1
 
     # Load model
     if args.pretrained:
-        print("Loading pretrained HuggingFace GPT2...")
-        model, params, config = load_pretrained()
+        model, params, config = load_pretrained(args.pretrained)
     else:
-        print(f"Loading checkpoint from {args.checkpoint}...")
+        print(f"{Colors.CYAN}Loading checkpoint from {args.checkpoint}...{Colors.RESET}")
         model, params, config = load_checkpoint(args.checkpoint)
 
-    print("✓ Model loaded")
+    print(f"{Colors.GREEN}✓ Model loaded{Colors.RESET}")
 
     # Get tokenizer
     enc = tiktoken.get_encoding("gpt2")
