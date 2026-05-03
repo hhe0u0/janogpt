@@ -144,6 +144,9 @@ class Trainer:
 
     def create_train_state(self) -> train_state.TrainState:
         """Create TrainState with initialized parameters and optimizer."""
+        print("Initializing model parameters...")
+        init_start = time.perf_counter()
+
         # Initialize model
         self.rng, params_rng, dropout_rng = jax.random.split(self.rng, 3)
 
@@ -160,9 +163,11 @@ class Trainer:
 
         # Count parameters
         param_count = sum(x.size for x in jax.tree_util.tree_leaves(params))
-        print(f"Model parameters: {param_count / 1e6:.2f}M")
+        init_time = time.perf_counter() - init_start
+        print(f"✓ Model initialized: {param_count / 1e6:.2f}M parameters ({init_time:.1f}s)")
 
         # Create optimizer
+        print("Creating optimizer...")
         tx = self.create_optimizer()
 
         # Create TrainState
@@ -174,8 +179,9 @@ class Trainer:
 
         # Replicate across devices if multi-device
         if self.num_devices > 1:
+            print(f"Replicating state across {self.num_devices} devices...")
             state = self.replicate(state)
-            print(f"State replicated across {self.num_devices} devices")
+            print(f"✓ State replicated across {self.num_devices} devices")
 
         return state
 
@@ -361,16 +367,18 @@ class Trainer:
         """Compile training steps based on number of devices."""
         if self.num_devices == 1:
             # Single device: use JIT
+            print("Setting up JIT compilation for single device...")
             self._train_step_fn = jax.jit(self._train_step_single)
-            print("Using JIT compilation for single device")
+            print("✓ JIT compilation configured (will compile on first step)")
         else:
             # Multi-device: use pmap
+            print(f"Setting up pmap compilation for {self.num_devices} devices...")
             self._train_step_fn = jax.pmap(
                 self._train_step_multi,
                 axis_name="devices",
                 donate_argnums=(0,),  # Donate state to avoid copy
             )
-            print(f"Using pmap compilation for {self.num_devices} devices")
+            print(f"✓ pmap compilation configured (will compile on first step)")
 
     def _train_step(self, batch: Dict[str, jnp.ndarray]):
         """Unified train step that routes to compiled function."""
@@ -574,15 +582,20 @@ class Trainer:
             # Train step
             if step == 1:
                 print(f"[step {step}] Starting first train step (JIT compilation will occur)...")
+                print(f"  - Compiling training step for {self.num_devices} device(s)...")
+                print(f"  - Effective batch: {self.effective_batch_size} seqs, {self.effective_batch_tokens/1e3:.0f}K tokens")
+                print(f"  - This may take 1-3 minutes depending on model size and device...")
                 step_start = time.perf_counter()
 
             self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
 
             if step == 1:
                 step_time = time.perf_counter() - step_start
-                print(
-                    f"[step {step}] First step complete (JIT compile + execution: {step_time:.1f}s)"
-                )
+                print(f"[step {step}] ✓ First step complete!")
+                print(f"  - Total time: {step_time:.1f}s (JIT compile + execution)")
+                print(f"  - Loss: {metrics['loss']:.4f}")
+                print(f"  - Subsequent steps will be much faster (~{step_time/10:.1f}s expected)")
+                print()
 
             # Extract metrics (unreplicate if multi-device)
             if self.num_devices > 1:
