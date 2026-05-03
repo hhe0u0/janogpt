@@ -1,0 +1,46 @@
+{
+  "_comment": "GPT-2 124M for Kaggle T4 GPU (single device) - 1000 steps",
+  "model": {
+    "num_blocks": 12,
+    "emb_dim": 768,
+    "num_heads": 12,
+    "seq_len": 1024,
+    "voc_size": 50304,
+    "dropout_prob": 0.1
+  },
+  "optimizer": {
+    "learning_rate": 6e-4,
+    "min_learning_rate": 6e-5,
+    "warmup_steps": 100,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "grad_clip": 1.0,
+    "weight_decay": 0.1
+  },
+  "training": {
+    "max_steps": 1000,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 512,
+    "_effective_batch_comment": "1 × 512 × 1 GPU × 1024 = 524,288 tokens ≈ 0.5M (same as before but single GPU)",
+    "eval_interval": 100,
+    "eval_iters": 10,
+    "log_interval": 10,
+    "seed": 42
+  },
+  "checkpointing": {
+    "save_interval": 250,
+    "output_dir": "output_kaggle_1k",
+    "resume_from_checkpoint": null
+  },
+  "data": {
+    "data_dir": "data/openwebtext",
+    "train_file": "train.bin",
+    "val_file": "val.bin"
+  },
+  "wandb": {
+    "enabled": true,
+    "project": "janogpt-kaggle",
+    "run_name": "gpt2-124m-1k-steps",
+    "tags": ["kaggle", "gpt2", "1000-steps", "single-gpu"]
+  }
+}
