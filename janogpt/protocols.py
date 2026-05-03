@@ -5,12 +5,13 @@ All components implement these interfaces for easy testing and swapping.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Iterator, Any, Optional
-import jax.numpy as jnp
-from flax import linen as nn
+from collections.abc import Iterator
+from typing import Any, Dict
 
+import jax.numpy as jnp
 
 # ========== Data Loading ==========
+
 
 class DataLoader(ABC):
     """Base interface for data loaders."""
@@ -32,6 +33,7 @@ class DataLoader(ABC):
 
 
 # ========== Model ==========
+
 
 class Model(ABC):
     """Base interface for models."""
@@ -73,6 +75,7 @@ class Model(ABC):
 
 # ========== Evaluation ==========
 
+
 class Evaluator(ABC):
     """Base interface for evaluators."""
 
@@ -104,6 +107,7 @@ class Evaluator(ABC):
 
 
 # ========== Logging ==========
+
 
 class Logger(ABC):
     """Base interface for loggers."""

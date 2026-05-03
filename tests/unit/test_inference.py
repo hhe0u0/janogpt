@@ -1,8 +1,8 @@
 """Unit tests for inference and generation."""
 
-import pytest
 import jax
 import jax.numpy as jnp
+import pytest
 
 from janogpt import GPT, Config
 from janogpt.inference import generate
@@ -27,7 +27,7 @@ def tiny_model_and_params(tiny_config):
     model = GPT(tiny_config)
     rng = jax.random.key(42)
     x = jnp.zeros((1, tiny_config.seq_len), dtype=jnp.uint16)
-    params = model.init({'params': rng, 'dropout': rng}, x, inference=True)['params']
+    params = model.init({"params": rng, "dropout": rng}, x, inference=True)["params"]
     return model, params
 
 
@@ -52,7 +52,7 @@ class TestGeneration:
 
         # Should return prompt + new tokens
         assert len(generated) == len(prompt_tokens) + 5
-        assert list(generated[:len(prompt_tokens)]) == prompt_tokens
+        assert list(generated[: len(prompt_tokens)]) == prompt_tokens
 
     def test_generate_respects_max_new_tokens(self, tiny_model_and_params):
         """Test generation stops at max_new_tokens."""

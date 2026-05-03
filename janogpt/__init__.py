@@ -11,8 +11,8 @@ A clean, educational implementation of GPT-2 in JAX/Flax with:
 
 __version__ = "0.1.0"
 
-from janogpt.model import GPT, count_params
 from janogpt.config import Config
+from janogpt.model import GPT, count_params
 from janogpt.trainer import Trainer
 
 __all__ = [

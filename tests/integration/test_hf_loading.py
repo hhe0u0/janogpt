@@ -1,8 +1,8 @@
 """Integration test for HuggingFace weight loading."""
 
-import pytest
 import jax
 import jax.numpy as jnp
+import pytest
 
 from janogpt import GPT, Config
 from janogpt.inference import generate
@@ -28,7 +28,8 @@ def gpt2_config():
 def hf_model():
     """Load HuggingFace GPT-2 model."""
     from transformers import GPT2LMHeadModel
-    model = GPT2LMHeadModel.from_pretrained('gpt2')
+
+    model = GPT2LMHeadModel.from_pretrained("gpt2")
     model.eval()
     return model
 
@@ -37,7 +38,8 @@ def hf_model():
 def hf_tokenizer():
     """Load HuggingFace tokenizer."""
     from transformers import GPT2Tokenizer
-    return GPT2Tokenizer.from_pretrained('gpt2')
+
+    return GPT2Tokenizer.from_pretrained("gpt2")
 
 
 class TestHFWeightLoading:
@@ -48,39 +50,39 @@ class TestHFWeightLoading:
         from pretrained.huggingface.loader import convert_hf_to_jax
 
         # Should not raise errors
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
 
         # Check structure
         assert isinstance(jax_params, dict)
-        assert 'Emb_0' in jax_params  # Embeddings
-        assert 'TransformerBlock_0' in jax_params  # First block
+        assert "Emb_0" in jax_params  # Embeddings
+        assert "TransformerBlock_0" in jax_params  # First block
 
     def test_loaded_params_shape_matches(self, gpt2_config):
         """Test loaded params have correct shapes."""
         from pretrained.huggingface.loader import convert_hf_to_jax
 
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
 
         # Check embedding shapes
-        wte = jax_params['Emb_0']['Embed_0']['embedding']
-        wpe = jax_params['Emb_0']['Embed_1']['embedding']
+        wte = jax_params["Emb_0"]["Embed_0"]["embedding"]
+        wpe = jax_params["Emb_0"]["Embed_1"]["embedding"]
 
         assert wte.shape == (50257, 768)  # Token embeddings
-        assert wpe.shape == (1024, 768)   # Position embeddings
+        assert wpe.shape == (1024, 768)  # Position embeddings
 
     def test_model_forward_with_hf_weights(self, gpt2_config):
         """Test forward pass with loaded HF weights."""
         from pretrained.huggingface.loader import convert_hf_to_jax
 
         # Load weights
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
 
         # Create model
         model = GPT(gpt2_config)
 
         # Forward pass
         x = jnp.array([[1, 2, 3, 4]], dtype=jnp.uint16)
-        logits = model.apply({'params': jax_params}, x, inference=True)
+        logits = model.apply({"params": jax_params}, x, inference=True)
 
         # Check output shape
         assert logits.shape == (1, 4, 50257)
@@ -97,7 +99,7 @@ class TestHFGenerationComparison:
         from pretrained.huggingface.loader import convert_hf_to_jax
 
         # Load weights
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
         model = GPT(gpt2_config)
 
         # Tokenize prompt
@@ -127,7 +129,7 @@ class TestHFGenerationComparison:
         """Test greedy generation is deterministic."""
         from pretrained.huggingface.loader import convert_hf_to_jax
 
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
         model = GPT(gpt2_config)
 
         prompt = "The capital of France is"
@@ -163,7 +165,7 @@ class TestHFGenerationComparison:
         """Test generation produces reasonable completions."""
         from pretrained.huggingface.loader import convert_hf_to_jax
 
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
         model = GPT(gpt2_config)
 
         test_prompts = [
@@ -202,15 +204,15 @@ class TestWeightMapping:
         """Test embedding weights are correctly mapped."""
         from pretrained.huggingface.loader import convert_hf_to_jax
 
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
 
         # Get HF embeddings
         hf_wte = hf_model.transformer.wte.weight.detach().cpu().numpy()
         hf_wpe = hf_model.transformer.wpe.weight.detach().cpu().numpy()
 
         # Get JAX embeddings
-        jax_wte = jax_params['Emb_0']['Embed_0']['embedding']
-        jax_wpe = jax_params['Emb_0']['Embed_1']['embedding']
+        jax_wte = jax_params["Emb_0"]["Embed_0"]["embedding"]
+        jax_wpe = jax_params["Emb_0"]["Embed_1"]["embedding"]
 
         # Should match (within precision)
         assert jnp.allclose(jax_wte, hf_wte, atol=1e-5)
@@ -220,33 +222,33 @@ class TestWeightMapping:
         """Test attention weights have correct shapes."""
         from pretrained.huggingface.loader import convert_hf_to_jax
 
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
 
         # Check first transformer block attention
-        block0 = jax_params['TransformerBlock_0']
-        attn = block0['SelfAttention_0']
+        block0 = jax_params["TransformerBlock_0"]
+        attn = block0["SelfAttention_0"]
 
         # Q, K, V projections
-        assert attn['Wq']['kernel'].shape == (768, 768)
-        assert attn['Wk']['kernel'].shape == (768, 768)
-        assert attn['Wv']['kernel'].shape == (768, 768)
+        assert attn["Wq"]["kernel"].shape == (768, 768)
+        assert attn["Wk"]["kernel"].shape == (768, 768)
+        assert attn["Wv"]["kernel"].shape == (768, 768)
 
         # Output projection
-        assert attn['Wo']['kernel'].shape == (768, 768)
+        assert attn["Wo"]["kernel"].shape == (768, 768)
 
     def test_mlp_weights_shape(self, gpt2_config):
         """Test MLP weights have correct shapes."""
         from pretrained.huggingface.loader import convert_hf_to_jax
 
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
 
         # Check first transformer block MLP
-        block0 = jax_params['TransformerBlock_0']
-        mlp = block0['FFN_0']
+        block0 = jax_params["TransformerBlock_0"]
+        mlp = block0["FFN_0"]
 
         # FF dim should be 4 * emb_dim = 3072
-        assert mlp['Dense_0']['kernel'].shape == (768, 3072)
-        assert mlp['Dense_1']['kernel'].shape == (3072, 768)
+        assert mlp["Dense_0"]["kernel"].shape == (768, 3072)
+        assert mlp["Dense_1"]["kernel"].shape == (3072, 768)
 
 
 class TestEndToEndPipeline:
@@ -257,7 +259,7 @@ class TestEndToEndPipeline:
         from pretrained.huggingface.loader import convert_hf_to_jax
 
         # 1. Load weights
-        jax_params = convert_hf_to_jax('gpt2', gpt2_config)
+        jax_params = convert_hf_to_jax("gpt2", gpt2_config)
 
         # 2. Create model
         model = GPT(gpt2_config)

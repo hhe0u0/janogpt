@@ -1,7 +1,8 @@
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
-import json
+
 import jax.numpy as jnp
 
 
@@ -11,7 +12,7 @@ class Config:
     dropout_prob: float = 0.1
     num_blocks: int = 12
     emb_dim: int = 768
-    ff_dim: int = 768 * 4 # Computed from emb_dim if None
+    ff_dim: int = 768 * 4  # Computed from emb_dim if None
     num_heads: int = 12
     seq_len: int = 1024
     epsilon: float = 1e-6
@@ -78,7 +79,7 @@ class Config:
         if not json_path.exists():
             raise FileNotFoundError(f"Config file not found: {json_path}")
 
-        with open(json_path, 'r') as f:
+        with open(json_path) as f:
             data = json.load(f)
 
         # Flatten nested structure
@@ -178,18 +179,22 @@ class Config:
         json_path = Path(json_path)
         json_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(json_path, 'w') as f:
+        with open(json_path, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     def __repr__(self):
         """Pretty print configuration."""
         lines = ["Config("]
         lines.append("  Model:")
-        lines.append(f"    blocks={self.num_blocks}, emb_dim={self.emb_dim}, heads={self.num_heads}")
+        lines.append(
+            f"    blocks={self.num_blocks}, emb_dim={self.emb_dim}, heads={self.num_heads}"
+        )
         lines.append(f"    seq_len={self.seq_len}, vocab={self.vocab_size}")
         lines.append("  Training:")
         lines.append(f"    max_steps={self.max_steps}, lr={self.learning_rate}")
-        lines.append(f"    micro_batch={self.micro_batch_size}, accum={self.gradient_accumulation_steps}")
+        lines.append(
+            f"    micro_batch={self.micro_batch_size}, accum={self.gradient_accumulation_steps}"
+        )
         lines.append("  Data:")
         lines.append(f"    data_dir={self.data_dir}")
         lines.append("  Output:")

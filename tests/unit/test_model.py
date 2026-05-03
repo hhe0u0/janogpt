@@ -1,8 +1,8 @@
 """Unit tests for GPT model."""
 
-import pytest
 import jax
 import jax.numpy as jnp
+import pytest
 
 from janogpt import GPT, Config, count_params
 
@@ -48,10 +48,10 @@ class TestGPTModel:
 
         # Initialize
         x = jnp.zeros((2, tiny_config.seq_len), dtype=jnp.uint16)
-        params = model.init({'params': rng, 'dropout': rng}, x, inference=True)['params']
+        params = model.init({"params": rng, "dropout": rng}, x, inference=True)["params"]
 
         # Forward pass
-        logits = model.apply({'params': params}, x, inference=True)
+        logits = model.apply({"params": params}, x, inference=True)
 
         # Check shape
         assert logits.shape == (2, tiny_config.seq_len, tiny_config.vocab_size)
@@ -63,12 +63,12 @@ class TestGPTModel:
 
         # Initialize with max length
         x_init = jnp.zeros((1, tiny_config.seq_len), dtype=jnp.uint16)
-        params = model.init({'params': rng, 'dropout': rng}, x_init, inference=True)['params']
+        params = model.init({"params": rng, "dropout": rng}, x_init, inference=True)["params"]
 
         # Test with shorter sequence
         seq_len = 8
         x_short = jnp.zeros((1, seq_len), dtype=jnp.uint16)
-        logits = model.apply({'params': params}, x_short, inference=True)
+        logits = model.apply({"params": params}, x_short, inference=True)
 
         assert logits.shape == (1, seq_len, tiny_config.vocab_size)
 
@@ -77,7 +77,7 @@ class TestGPTModel:
         model = GPT(tiny_config)
         rng = jax.random.key(42)
         x = jnp.zeros((1, tiny_config.seq_len), dtype=jnp.uint16)
-        params = model.init({'params': rng, 'dropout': rng}, x, inference=True)['params']
+        params = model.init({"params": rng, "dropout": rng}, x, inference=True)["params"]
 
         param_count = count_params(params)
         assert param_count > 0
@@ -88,7 +88,7 @@ class TestGPTModel:
         model = GPT(gpt2_config)
         rng = jax.random.key(42)
         x = jnp.zeros((1, gpt2_config.seq_len), dtype=jnp.uint16)
-        params = model.init({'params': rng, 'dropout': rng}, x, inference=True)['params']
+        params = model.init({"params": rng, "dropout": rng}, x, inference=True)["params"]
 
         param_count = count_params(params)
         # Should be ~124M parameters
@@ -100,11 +100,11 @@ class TestGPTModel:
         rng = jax.random.key(42)
 
         x = jnp.ones((1, tiny_config.seq_len), dtype=jnp.uint16)
-        params = model.init({'params': rng, 'dropout': rng}, x, inference=True)['params']
+        params = model.init({"params": rng, "dropout": rng}, x, inference=True)["params"]
 
         # Forward pass twice with inference=True should give same result
-        logits1 = model.apply({'params': params}, x, inference=True)
-        logits2 = model.apply({'params': params}, x, inference=True)
+        logits1 = model.apply({"params": params}, x, inference=True)
+        logits2 = model.apply({"params": params}, x, inference=True)
 
         assert jnp.allclose(logits1, logits2)
 
@@ -114,9 +114,9 @@ class TestGPTModel:
         rng = jax.random.key(42)
 
         x = jnp.arange(tiny_config.seq_len, dtype=jnp.uint16)[None, :]
-        params = model.init({'params': rng, 'dropout': rng}, x, inference=True)['params']
+        params = model.init({"params": rng, "dropout": rng}, x, inference=True)["params"]
 
-        logits = model.apply({'params': params}, x, inference=True)
+        logits = model.apply({"params": params}, x, inference=True)
 
         # Logits at position i should only depend on positions 0..i
         # This is hard to test directly, but we can verify shape is correct
@@ -140,8 +140,8 @@ class TestConfig:
         """Test config serialization."""
         config_dict = gpt2_config.to_dict()
         assert isinstance(config_dict, dict)
-        assert 'model' in config_dict
-        assert config_dict['model']['num_blocks'] == 12
+        assert "model" in config_dict
+        assert config_dict["model"]["num_blocks"] == 12
 
     def test_config_from_json(self, tmp_path):
         """Test config loading from JSON."""
@@ -156,10 +156,10 @@ class TestConfig:
             },
             "training": {
                 "max_steps": 1000,
-            }
+            },
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config_data, f)
 
         config = Config.from_json(str(config_file))

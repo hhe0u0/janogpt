@@ -1,9 +1,8 @@
 """Unit tests for Trainer."""
 
-import pytest
 import jax
 import jax.numpy as jnp
-import optax
+import pytest
 
 from janogpt import GPT, Config, Trainer
 from janogpt.utils import DummyDataLoader
@@ -63,10 +62,10 @@ class TestTrainerInit:
         trainer = Trainer(tiny_model, tiny_config, seed=42)
 
         # Check TrainState fields
-        assert hasattr(trainer.state, 'params')
-        assert hasattr(trainer.state, 'tx')
-        assert hasattr(trainer.state, 'opt_state')
-        assert hasattr(trainer.state, 'step')
+        assert hasattr(trainer.state, "params")
+        assert hasattr(trainer.state, "tx")
+        assert hasattr(trainer.state, "opt_state")
+        assert hasattr(trainer.state, "step")
 
         # Check params are initialized
         assert trainer.state.params is not None
@@ -172,14 +171,14 @@ class TestTrainStep:
         metrics = trainer._train_step(batch_jax)
 
         # Check metrics
-        assert 'loss' in metrics
-        assert 'perplexity' in metrics
-        assert 'grad_norm' in metrics
-        assert 'learning_rate' in metrics
+        assert "loss" in metrics
+        assert "perplexity" in metrics
+        assert "grad_norm" in metrics
+        assert "learning_rate" in metrics
 
         # Check loss is finite
-        assert jnp.isfinite(metrics['loss'])
-        assert metrics['loss'] > 0
+        assert jnp.isfinite(metrics["loss"])
+        assert metrics["loss"] > 0
 
         # Check step incremented
         assert trainer.state.step == initial_step + 1
@@ -196,7 +195,7 @@ class TestTrainStep:
         losses = []
         for _ in range(5):
             metrics = trainer._train_step(batch_jax)
-            losses.append(float(metrics['loss']))
+            losses.append(float(metrics["loss"]))
 
         # Loss should decrease (overfitting)
         assert losses[-1] < losses[0], f"Loss did not decrease: {losses}"
@@ -227,8 +226,8 @@ class TestEvaluation:
         eval_metrics = trainer.evaluate(dummy_dataloader, eval_iters=3)
 
         assert isinstance(eval_metrics, dict)
-        assert 'eval/loss' in eval_metrics
-        eval_loss = eval_metrics['eval/loss']
+        assert "eval/loss" in eval_metrics
+        eval_loss = eval_metrics["eval/loss"]
         assert isinstance(eval_loss, float)
         assert jnp.isfinite(eval_loss)
         assert eval_loss > 0
@@ -249,7 +248,7 @@ class TestDeviceSupport:
         trainer = Trainer(tiny_model, tiny_config, seed=42)
 
         # Create test pytree
-        test_tree = {'a': jnp.array([1, 2, 3]), 'b': jnp.array([4, 5])}
+        test_tree = {"a": jnp.array([1, 2, 3]), "b": jnp.array([4, 5])}
 
         # Replicate
         replicated = trainer.replicate(test_tree)
@@ -258,5 +257,5 @@ class TestDeviceSupport:
         unreplicated = trainer.unreplicate(replicated)
 
         # Should match original
-        assert jnp.allclose(unreplicated['a'], test_tree['a'])
-        assert jnp.allclose(unreplicated['b'], test_tree['b'])
+        assert jnp.allclose(unreplicated["a"], test_tree["a"])
+        assert jnp.allclose(unreplicated["b"], test_tree["b"])

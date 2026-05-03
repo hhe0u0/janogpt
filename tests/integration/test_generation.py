@@ -1,8 +1,8 @@
 """Integration test for text generation."""
 
-import pytest
 import jax
 import jax.numpy as jnp
+import pytest
 
 from janogpt import GPT, Config, Trainer
 from janogpt.inference import generate
@@ -67,7 +67,7 @@ class TestGenerationBasics:
 
         # Should extend prompt
         assert len(generated) == len(prompt) + 10
-        assert generated[:len(prompt)] == prompt
+        assert generated[: len(prompt)] == prompt
 
         # All tokens should be valid
         for token in generated:
@@ -132,6 +132,7 @@ class TestTemperatureSampling:
 
         # Most should be similar (at least 3 out of 5 match)
         from collections import Counter
+
         counts = Counter([tuple(out) for out in outputs])
         most_common_count = counts.most_common(1)[0][1]
         assert most_common_count >= 3
@@ -360,7 +361,7 @@ class TestGenerationAfterTraining:
             trainer._train_step(fixed_batch_jax)
 
         # Generate starting from tokens in training data
-        prompt = list(fixed_batch['input_ids'][0][:5])
+        prompt = list(fixed_batch["input_ids"][0][:5])
         rng = jax.random.key(42)
 
         generated = generate(

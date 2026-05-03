@@ -25,8 +25,33 @@ Our JAX/Flax format:
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from flax.core import freeze
+
+
+def load_hf_gpt2_weights(our_model, config, model_name="gpt2"):
+    """
+    Load pretrained GPT-2 weights from HuggingFace and convert to JAX format.
+
+    Args:
+        our_model: Our Flax GPT model
+        config: Our model config
+        model_name: HuggingFace model name (gpt2, gpt2-medium, gpt2-large, gpt2-xl)
+
+    Returns:
+        JAX parameters in our model's format
+    """
+    try:
+        from transformers import GPT2LMHeadModel
+    except ImportError:
+        raise ImportError(
+            "transformers not installed. Run: pip install transformers torch"
+        )
+
+    print(f"Downloading {model_name} from HuggingFace...")
+    hf_model = GPT2LMHeadModel.from_pretrained(model_name)
+    print("✓ Download complete")
+
+    return convert_hf_to_jax(hf_model, our_model, config)
 
 
 def convert_hf_to_jax(hf_model, our_model, config):
@@ -48,28 +73,25 @@ def convert_hf_to_jax(hf_model, our_model, config):
     # Initialize our model to get structure
     rng = jax.random.key(42)
     dummy_input = jnp.zeros((1, config.seq_len), dtype=jnp.uint16)
-    variables = our_model.init(
-        {'params': rng, 'dropout': rng},
-        dummy_input,
-        inference=True
-    )
+    variables = our_model.init({"params": rng, "dropout": rng}, dummy_input, inference=True)
 
     # We'll build params as a mutable dict - need to unfreeze properly
     from flax.core import unfreeze
-    params = unfreeze(variables['params'])
+
+    params = unfreeze(variables["params"])
 
     # Convert embeddings
     print("  Converting embeddings...")
 
     # Token embeddings: wte.weight -> Emb_0/Embed_0/embedding
-    hf_wte = hf_state['transformer.wte.weight'].cpu().numpy()  # (vocab, emb)
-    if 'Emb_0' not in params:
-        params['Emb_0'] = {}
-    params['Emb_0']['Embed_0'] = {'embedding': jnp.array(hf_wte)}
+    hf_wte = hf_state["transformer.wte.weight"].cpu().numpy()  # (vocab, emb)
+    if "Emb_0" not in params:
+        params["Emb_0"] = {}
+    params["Emb_0"]["Embed_0"] = {"embedding": jnp.array(hf_wte)}
 
     # Position embeddings: wpe.weight -> Emb_0/Embed_1/embedding
-    hf_wpe = hf_state['transformer.wpe.weight'].cpu().numpy()  # (seq, emb)
-    params['Emb_0']['Embed_1'] = {'embedding': jnp.array(hf_wpe)}
+    hf_wpe = hf_state["transformer.wpe.weight"].cpu().numpy()  # (seq, emb)
+    params["Emb_0"]["Embed_1"] = {"embedding": jnp.array(hf_wpe)}
 
     print(f"    Token embeddings: {hf_wte.shape} -> Emb_0/Embed_0")
     print(f"    Position embeddings: {hf_wpe.shape} -> Emb_0/Embed_1")
@@ -78,23 +100,27 @@ def convert_hf_to_jax(hf_model, our_model, config):
     for i in range(config.num_blocks):
         print(f"  Converting block {i}...")
 
-        block_key = f'AttnBlock_{i}'
+        block_key = f"AttnBlock_{i}"
         if block_key not in params:
             params[block_key] = {}
 
         # Pre-attention LayerNorm
-        ln1_weight = hf_state[f'transformer.h.{i}.ln_1.weight'].cpu().numpy()
-        ln1_bias = hf_state[f'transformer.h.{i}.ln_1.bias'].cpu().numpy()
-        params[block_key]['LayerNorm_0'] = {
-            'scale': jnp.array(ln1_weight),
-            'bias': jnp.array(ln1_bias)
+        ln1_weight = hf_state[f"transformer.h.{i}.ln_1.weight"].cpu().numpy()
+        ln1_bias = hf_state[f"transformer.h.{i}.ln_1.bias"].cpu().numpy()
+        params[block_key]["LayerNorm_0"] = {
+            "scale": jnp.array(ln1_weight),
+            "bias": jnp.array(ln1_bias),
         }
 
         # Attention weights
         # HF uses Conv1D format: stored as (in_features, out_features) = (emb, 3*emb)
         # c_attn contains Q, K, V projections concatenated
-        c_attn_weight = hf_state[f'transformer.h.{i}.attn.c_attn.weight'].cpu().numpy()  # (emb, 3*emb) = (768, 2304)
-        c_attn_bias = hf_state[f'transformer.h.{i}.attn.c_attn.bias'].cpu().numpy()  # (3*emb,) = (2304,)
+        c_attn_weight = (
+            hf_state[f"transformer.h.{i}.attn.c_attn.weight"].cpu().numpy()
+        )  # (emb, 3*emb) = (768, 2304)
+        c_attn_bias = (
+            hf_state[f"transformer.h.{i}.attn.c_attn.bias"].cpu().numpy()
+        )  # (3*emb,) = (2304,)
 
         # Split into Q, K, V
         qkv_weight = c_attn_weight  # (emb, 3*emb)
@@ -110,12 +136,12 @@ def convert_hf_to_jax(hf_model, our_model, config):
 
         # Split QKV
         q_weight = qkv_weight[:, :emb_dim]  # (emb, emb)
-        k_weight = qkv_weight[:, emb_dim:2*emb_dim]
-        v_weight = qkv_weight[:, 2*emb_dim:]
+        k_weight = qkv_weight[:, emb_dim : 2 * emb_dim]
+        v_weight = qkv_weight[:, 2 * emb_dim :]
 
         q_bias = qkv_bias[:emb_dim]
-        k_bias = qkv_bias[emb_dim:2*emb_dim]
-        v_bias = qkv_bias[2*emb_dim:]
+        k_bias = qkv_bias[emb_dim : 2 * emb_dim]
+        v_bias = qkv_bias[2 * emb_dim :]
 
         # Reshape to (emb, num_heads, head_dim)
         q_kernel = q_weight.reshape(emb_dim, num_heads, head_dim)
@@ -127,55 +153,58 @@ def convert_hf_to_jax(hf_model, our_model, config):
         v_bias_reshaped = v_bias.reshape(num_heads, head_dim)
 
         # Output projection (emb, emb) in Conv1D format
-        c_proj_weight = hf_state[f'transformer.h.{i}.attn.c_proj.weight'].cpu().numpy()  # (emb, emb) = (768, 768)
-        c_proj_bias = hf_state[f'transformer.h.{i}.attn.c_proj.bias'].cpu().numpy()  # (emb,)
+        c_proj_weight = (
+            hf_state[f"transformer.h.{i}.attn.c_proj.weight"].cpu().numpy()
+        )  # (emb, emb) = (768, 768)
+        c_proj_bias = hf_state[f"transformer.h.{i}.attn.c_proj.bias"].cpu().numpy()  # (emb,)
 
         # Reshape output projection to (num_heads, head_dim, emb)
         # Input to out projection is (batch, seq, num_heads, head_dim) → needs (num_heads, head_dim, emb)
         out_kernel = c_proj_weight.reshape(num_heads, head_dim, emb_dim)
 
-        params[block_key]['MultiHeadDotProductAttention_0'] = {
-            'query': {'kernel': jnp.array(q_kernel), 'bias': jnp.array(q_bias_reshaped)},
-            'key': {'kernel': jnp.array(k_kernel), 'bias': jnp.array(k_bias_reshaped)},
-            'value': {'kernel': jnp.array(v_kernel), 'bias': jnp.array(v_bias_reshaped)},
-            'out': {'kernel': jnp.array(out_kernel), 'bias': jnp.array(c_proj_bias)},
+        params[block_key]["MultiHeadDotProductAttention_0"] = {
+            "query": {"kernel": jnp.array(q_kernel), "bias": jnp.array(q_bias_reshaped)},
+            "key": {"kernel": jnp.array(k_kernel), "bias": jnp.array(k_bias_reshaped)},
+            "value": {"kernel": jnp.array(v_kernel), "bias": jnp.array(v_bias_reshaped)},
+            "out": {"kernel": jnp.array(out_kernel), "bias": jnp.array(c_proj_bias)},
         }
 
         # Pre-MLP LayerNorm
-        ln2_weight = hf_state[f'transformer.h.{i}.ln_2.weight'].cpu().numpy()
-        ln2_bias = hf_state[f'transformer.h.{i}.ln_2.bias'].cpu().numpy()
-        params[block_key]['LayerNorm_1'] = {
-            'scale': jnp.array(ln2_weight),
-            'bias': jnp.array(ln2_bias)
+        ln2_weight = hf_state[f"transformer.h.{i}.ln_2.weight"].cpu().numpy()
+        ln2_bias = hf_state[f"transformer.h.{i}.ln_2.bias"].cpu().numpy()
+        params[block_key]["LayerNorm_1"] = {
+            "scale": jnp.array(ln2_weight),
+            "bias": jnp.array(ln2_bias),
         }
 
         # MLP
         # First layer (emb -> 4*emb) in Conv1D format
-        mlp_fc_weight = hf_state[f'transformer.h.{i}.mlp.c_fc.weight'].cpu().numpy()  # (emb, 4*emb) = (768, 3072)
-        mlp_fc_bias = hf_state[f'transformer.h.{i}.mlp.c_fc.bias'].cpu().numpy()  # (4*emb,)
+        mlp_fc_weight = (
+            hf_state[f"transformer.h.{i}.mlp.c_fc.weight"].cpu().numpy()
+        )  # (emb, 4*emb) = (768, 3072)
+        mlp_fc_bias = hf_state[f"transformer.h.{i}.mlp.c_fc.bias"].cpu().numpy()  # (4*emb,)
 
-        params[block_key]['Dense_0'] = {
-            'kernel': jnp.array(mlp_fc_weight),
-            'bias': jnp.array(mlp_fc_bias)
+        params[block_key]["Dense_0"] = {
+            "kernel": jnp.array(mlp_fc_weight),
+            "bias": jnp.array(mlp_fc_bias),
         }
 
         # Second layer (4*emb -> emb) in Conv1D format
-        mlp_proj_weight = hf_state[f'transformer.h.{i}.mlp.c_proj.weight'].cpu().numpy()  # (4*emb, emb) = (3072, 768)
-        mlp_proj_bias = hf_state[f'transformer.h.{i}.mlp.c_proj.bias'].cpu().numpy()  # (emb,)
+        mlp_proj_weight = (
+            hf_state[f"transformer.h.{i}.mlp.c_proj.weight"].cpu().numpy()
+        )  # (4*emb, emb) = (3072, 768)
+        mlp_proj_bias = hf_state[f"transformer.h.{i}.mlp.c_proj.bias"].cpu().numpy()  # (emb,)
 
-        params[block_key]['Dense_1'] = {
-            'kernel': jnp.array(mlp_proj_weight),
-            'bias': jnp.array(mlp_proj_bias)
+        params[block_key]["Dense_1"] = {
+            "kernel": jnp.array(mlp_proj_weight),
+            "bias": jnp.array(mlp_proj_bias),
         }
 
     # Final LayerNorm
     print("  Converting final LayerNorm...")
-    ln_f_weight = hf_state['transformer.ln_f.weight'].cpu().numpy()
-    ln_f_bias = hf_state['transformer.ln_f.bias'].cpu().numpy()
-    params['LayerNorm_0'] = {
-        'scale': jnp.array(ln_f_weight),
-        'bias': jnp.array(ln_f_bias)
-    }
+    ln_f_weight = hf_state["transformer.ln_f.weight"].cpu().numpy()
+    ln_f_bias = hf_state["transformer.ln_f.bias"].cpu().numpy()
+    params["LayerNorm_0"] = {"scale": jnp.array(ln_f_weight), "bias": jnp.array(ln_f_bias)}
 
     print("✓ Weight conversion complete!")
 

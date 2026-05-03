@@ -10,16 +10,16 @@ Supports:
 - Evaluation outside of JIT
 """
 
-from pathlib import Path
-from typing import Dict, Iterator
 import time
-import numpy as np
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Dict
 
+import flax.linen as nn
 import jax
 import jax.numpy as jnp
 import optax
 from flax.training import train_state
-import flax.linen as nn
 
 from janogpt.config import Config
 from janogpt.model import GPT, count_params
@@ -36,8 +36,8 @@ class Trainer:
         model: nn.Module,
         config: Config,
         evaluators: list = None,
-        logger = None,
-        seed: int = 3407
+        logger=None,
+        seed: int = 3407,
     ):
         """
         Initialize trainer with dependency injection.
@@ -63,14 +63,14 @@ class Trainer:
 
         # Calculate effective batch size
         self.effective_batch_size = (
-            config.micro_batch_size
-            * config.gradient_accumulation_steps
-            * self.num_devices
+            config.micro_batch_size * config.gradient_accumulation_steps * self.num_devices
         )
         self.effective_batch_tokens = self.effective_batch_size * config.seq_len
 
-        print(f"Effective batch: {self.effective_batch_size} seqs "
-              f"= {self.effective_batch_tokens / 1e3:.0f}K tokens per step")
+        print(
+            f"Effective batch: {self.effective_batch_size} seqs "
+            f"= {self.effective_batch_tokens / 1e3:.0f}K tokens per step"
+        )
 
         # Initialize model and training state
         print("Initializing model...")
@@ -99,7 +99,9 @@ class Trainer:
         # Ensure warmup_steps < max_steps for valid decay schedule
         warmup_steps = min(self.config.warmup_steps, self.config.max_steps - 1)
         if warmup_steps < self.config.warmup_steps:
-            print(f"⚠️  Reduced warmup_steps from {self.config.warmup_steps} to {warmup_steps} (max_steps={self.config.max_steps})")
+            print(
+                f"⚠️  Reduced warmup_steps from {self.config.warmup_steps} to {warmup_steps} (max_steps={self.config.max_steps})"
+            )
 
         return optax.warmup_cosine_decay_schedule(
             init_value=0.0,
@@ -134,11 +136,11 @@ class Trainer:
 
         # Initialize parameters
         variables = self.model.init(
-            {'params': params_rng, 'dropout': dropout_rng},
+            {"params": params_rng, "dropout": dropout_rng},
             dummy_input,
             inference=True,
         )
-        params = variables['params']
+        params = variables["params"]
 
         # Count parameters
         param_count = sum(x.size for x in jax.tree_util.tree_leaves(params))
@@ -182,21 +184,19 @@ class Trainer:
         """
         # Forward pass
         logits = self.model.apply(
-            {'params': params},
-            batch['input_ids'],
+            {"params": params},
+            batch["input_ids"],
             inference=not training,
-            rngs={'dropout': rng} if training else None,
+            rngs={"dropout": rng} if training else None,
         )
 
         # Shift for next-token prediction
         # logits[:, :-1, :] predicts tokens[:, 1:]
         shift_logits = logits[:, :-1, :]  # (B, T-1, V)
-        shift_labels = batch['input_ids'][:, 1:]  # (B, T-1)
+        shift_labels = batch["input_ids"][:, 1:]  # (B, T-1)
 
         # Cross-entropy loss
-        loss = optax.softmax_cross_entropy_with_integer_labels(
-            shift_logits, shift_labels
-        ).mean()
+        loss = optax.softmax_cross_entropy_with_integer_labels(shift_logits, shift_labels).mean()
 
         return loss
 
@@ -222,6 +222,7 @@ class Trainer:
         Single-device train step with gradient accumulation.
         Uses lax.scan for memory efficiency.
         """
+
         def accum_fn(carry, xs):
             acc_grads, acc_loss = carry
             micro_batch, rng = xs
@@ -232,9 +233,7 @@ class Trainer:
             )
 
             # Accumulate
-            acc_grads = jax.tree_util.tree_map(
-                lambda a, g: a + g, acc_grads, grads
-            )
+            acc_grads = jax.tree_util.tree_map(lambda a, g: a + g, acc_grads, grads)
             acc_loss = acc_loss + loss
 
             return (acc_grads, acc_loss), None
@@ -253,8 +252,7 @@ class Trainer:
 
         # Average gradients
         acc_grads = jax.tree_util.tree_map(
-            lambda g: g / self.config.gradient_accumulation_steps,
-            acc_grads
+            lambda g: g / self.config.gradient_accumulation_steps, acc_grads
         )
         acc_loss = acc_loss / self.config.gradient_accumulation_steps
 
@@ -264,10 +262,10 @@ class Trainer:
         # Compute metrics
         grad_norm = optax.global_norm(acc_grads)
         metrics = {
-            'loss': acc_loss,
-            'perplexity': jnp.exp(acc_loss),
-            'grad_norm': grad_norm,
-            'learning_rate': self.get_learning_rate(state.step),
+            "loss": acc_loss,
+            "perplexity": jnp.exp(acc_loss),
+            "grad_norm": grad_norm,
+            "learning_rate": self.get_learning_rate(state.step),
         }
 
         return state, metrics
@@ -284,6 +282,7 @@ class Trainer:
         Multi-device train step with gradient accumulation.
         Each device accumulates independently, then pmean syncs.
         """
+
         def accum_fn(carry, xs):
             acc_grads, acc_loss = carry
             micro_batch, rng = xs
@@ -292,9 +291,7 @@ class Trainer:
                 state.params, micro_batch, rng, training=True
             )
 
-            acc_grads = jax.tree_util.tree_map(
-                lambda a, g: a + g, acc_grads, grads
-            )
+            acc_grads = jax.tree_util.tree_map(lambda a, g: a + g, acc_grads, grads)
             acc_loss = acc_loss + loss
 
             return (acc_grads, acc_loss), None
@@ -313,24 +310,23 @@ class Trainer:
 
         # Average within device
         acc_grads = jax.tree_util.tree_map(
-            lambda g: g / self.config.gradient_accumulation_steps,
-            acc_grads
+            lambda g: g / self.config.gradient_accumulation_steps, acc_grads
         )
         acc_loss = acc_loss / self.config.gradient_accumulation_steps
 
         # Sync across devices
-        acc_grads = jax.lax.pmean(acc_grads, axis_name='devices')
-        acc_loss = jax.lax.pmean(acc_loss, axis_name='devices')
+        acc_grads = jax.lax.pmean(acc_grads, axis_name="devices")
+        acc_loss = jax.lax.pmean(acc_loss, axis_name="devices")
 
         # Apply gradients (synchronized)
         state = state.apply_gradients(grads=acc_grads)
 
         grad_norm = optax.global_norm(acc_grads)
         metrics = {
-            'loss': acc_loss,
-            'perplexity': jnp.exp(acc_loss),
-            'grad_norm': grad_norm,
-            'learning_rate': self.get_learning_rate(state.step),
+            "loss": acc_loss,
+            "perplexity": jnp.exp(acc_loss),
+            "grad_norm": grad_norm,
+            "learning_rate": self.get_learning_rate(state.step),
         }
 
         return state, metrics
@@ -345,14 +341,14 @@ class Trainer:
             # Multi-device: use pmap
             self._train_step_fn = jax.pmap(
                 self._train_step_multi,
-                axis_name='devices',
+                axis_name="devices",
                 donate_argnums=(0,),  # Donate state to avoid copy
             )
             print(f"Using pmap compilation for {self.num_devices} devices")
 
     def _train_step(self, batch: Dict[str, jnp.ndarray]):
         """Unified train step that routes to compiled function."""
-        if not hasattr(self, '_train_step_fn'):
+        if not hasattr(self, "_train_step_fn"):
             self._compile_train_step()
 
         # Prepare batch (includes sharding for multi-device)
@@ -362,15 +358,17 @@ class Trainer:
         if self.num_devices == 1:
             # Single device
             metrics = self._train_step_fn(self.state, prepared_batch)
-            self.state = metrics['state']
-            return {k: v for k, v in metrics.items() if k != 'state'}
-        else:
-            # Multi-device
-            metrics = self._train_step_fn(self.state, prepared_batch)
-            self.state = metrics['state']
-            # Unreplicate metrics
-            return {k: self.unreplicate(v) if k != 'state' else v
-                    for k, v in metrics.items() if k != 'state'}
+            self.state = metrics["state"]
+            return {k: v for k, v in metrics.items() if k != "state"}
+        # Multi-device
+        metrics = self._train_step_fn(self.state, prepared_batch)
+        self.state = metrics["state"]
+        # Unreplicate metrics
+        return {
+            k: self.unreplicate(v) if k != "state" else v
+            for k, v in metrics.items()
+            if k != "state"
+        }
 
     # ========== Evaluation ==========
 
@@ -386,7 +384,7 @@ class Trainer:
             None,  # No RNG needed for eval
             training=False,
         )
-        return {'eval_loss': loss, 'eval_perplexity': jnp.exp(loss)}
+        return {"eval_loss": loss, "eval_perplexity": jnp.exp(loss)}
 
     def _eval_step_multi(
         self,
@@ -401,19 +399,18 @@ class Trainer:
             training=False,
         )
         # Sync across devices
-        loss = jax.lax.pmean(loss, axis_name='devices')
-        return {'eval_loss': loss, 'eval_perplexity': jnp.exp(loss)}
+        loss = jax.lax.pmean(loss, axis_name="devices")
+        return {"eval_loss": loss, "eval_perplexity": jnp.exp(loss)}
 
     def _eval_step(self, batch: Dict[str, jnp.ndarray]):
         """Unified eval step that routes to single or multi device."""
         if self.num_devices == 1:
             metrics = self._eval_step_single(self.state, batch)
-            return metrics['eval_loss']
-        else:
-            metrics = self._eval_step_multi(self.state, batch)
-            return self.unreplicate(metrics['eval_loss'])
+            return metrics["eval_loss"]
+        metrics = self._eval_step_multi(self.state, batch)
+        return self.unreplicate(metrics["eval_loss"])
 
-    def evaluate(self, eval_loader: Iterator, step = None, eval_iters = None) -> Dict[str, float]:
+    def evaluate(self, eval_loader: Iterator, step=None, eval_iters=None) -> Dict[str, float]:
         """
         Run evaluation on validation set.
 
@@ -428,14 +425,11 @@ class Trainer:
         if eval_iters is None:
             eval_iters = self.config.eval_iters
         # Compile eval step if not done yet
-        if not hasattr(self, '_eval_step_fn'):
+        if not hasattr(self, "_eval_step_fn"):
             if self.num_devices == 1:
                 self._eval_step_fn = jax.jit(self._eval_step_single)
             else:
-                self._eval_step_fn = jax.pmap(
-                    self._eval_step_multi,
-                    axis_name='devices'
-                )
+                self._eval_step_fn = jax.pmap(self._eval_step_multi, axis_name="devices")
 
         total_loss = 0.0
         num_batches = 0
@@ -450,6 +444,7 @@ class Trainer:
             # Shard if multi-device
             if self.num_devices > 1:
                 from dataloader import shard_batch
+
                 batch_jax = shard_batch(batch_jax, self.num_devices)
 
             # Eval step
@@ -457,9 +452,9 @@ class Trainer:
 
             # Extract scalar (unreplicate if multi-device)
             if self.num_devices > 1:
-                loss = float(metrics['eval_loss'][0])
+                loss = float(metrics["eval_loss"][0])
             else:
-                loss = float(metrics['eval_loss'])
+                loss = float(metrics["eval_loss"])
 
             total_loss += loss
             num_batches += 1
@@ -468,17 +463,13 @@ class Trainer:
         avg_perplexity = jnp.exp(avg_loss)
 
         result = {
-            'eval/loss': float(avg_loss),
-            'eval/perplexity': float(avg_perplexity),
+            "eval/loss": float(avg_loss),
+            "eval/perplexity": float(avg_perplexity),
         }
 
         # Print
         step_str = f"step={step:>7d}" if step is not None else "final"
-        print(
-            f"[eval  {step_str}] "
-            f"loss={avg_loss:.4f}  "
-            f"ppl={avg_perplexity:.2f}"
-        )
+        print(f"[eval  {step_str}] loss={avg_loss:.4f}  ppl={avg_perplexity:.2f}")
 
         return result
 
@@ -504,11 +495,8 @@ class Trainer:
             def _reshape(x):
                 B = x.shape[0]
                 micro = B // self.config.gradient_accumulation_steps
-                return x.reshape(
-                    self.config.gradient_accumulation_steps,
-                    micro,
-                    *x.shape[1:]
-                )
+                return x.reshape(self.config.gradient_accumulation_steps, micro, *x.shape[1:])
+
             batch_jax = {k: _reshape(v) for k, v in batch_jax.items()}
 
         return batch_jax
@@ -520,17 +508,15 @@ class Trainer:
         if self.num_devices > 1:
             # (num_devices, accum_steps) - each entry is a full PRNG key
             keys = jax.random.split(
-                base,
-                self.num_devices * self.config.gradient_accumulation_steps
+                base, self.num_devices * self.config.gradient_accumulation_steps
             )
             return keys.reshape(
                 self.num_devices,
                 self.config.gradient_accumulation_steps,
             )
-        else:
-            # (accum_steps,) - each entry is a full PRNG key
-            keys = jax.random.split(base, self.config.gradient_accumulation_steps)
-            return keys
+        # (accum_steps,) - each entry is a full PRNG key
+        keys = jax.random.split(base, self.config.gradient_accumulation_steps)
+        return keys
 
     def train(self, train_loader: Iterator):
         """
@@ -568,15 +554,13 @@ class Trainer:
                 print(f"[step {step}] Starting first train step (JIT compilation will occur)...")
                 step_start = time.perf_counter()
 
-            self.state, metrics = self._train_step_fn(
-                self.state,
-                batch_jax,
-                dropout_rngs
-            )
+            self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
 
             if step == 1:
                 step_time = time.perf_counter() - step_start
-                print(f"[step {step}] First step complete (JIT compile + execution: {step_time:.1f}s)")
+                print(
+                    f"[step {step}] First step complete (JIT compile + execution: {step_time:.1f}s)"
+                )
 
             # Extract metrics (unreplicate if multi-device)
             if self.num_devices > 1:
@@ -585,10 +569,8 @@ class Trainer:
                 metrics = {k: float(v) for k, v in metrics.items()}
 
             # Update EMA loss
-            loss = metrics['loss']
-            loss_ema = loss if loss_ema is None else (
-                ema_alpha * loss_ema + (1 - ema_alpha) * loss
-            )
+            loss = metrics["loss"]
+            loss_ema = loss if loss_ema is None else (ema_alpha * loss_ema + (1 - ema_alpha) * loss)
 
             # Log metrics
             if step % self.config.log_interval == 0:
@@ -596,13 +578,13 @@ class Trainer:
                 tokens_per_sec = step * self.effective_batch_tokens / elapsed
 
                 log_dict = {
-                    'train/loss': loss,
-                    'train/loss_ema': loss_ema,
-                    'train/perplexity': metrics['perplexity'],
-                    'train/grad_norm': metrics['grad_norm'],
-                    'train/learning_rate': metrics['learning_rate'],
-                    'train/tokens_per_sec': tokens_per_sec,
-                    'step': step,
+                    "train/loss": loss,
+                    "train/loss_ema": loss_ema,
+                    "train/perplexity": metrics["perplexity"],
+                    "train/grad_norm": metrics["grad_norm"],
+                    "train/learning_rate": metrics["learning_rate"],
+                    "train/tokens_per_sec": tokens_per_sec,
+                    "step": step,
                 }
 
                 if self.logger:
@@ -611,15 +593,13 @@ class Trainer:
             # Run evaluators
             if self.evaluators and step % self.config.eval_interval == 0:
                 for evaluator in self.evaluators:
-                    eval_metrics = evaluator.evaluate(
-                        self.state,
-                        self.compute_loss,
-                        step
-                    )
+                    eval_metrics = evaluator.evaluate(self.state, self.compute_loss, step)
                     if self.logger:
                         self.logger.log(eval_metrics, step=step)
-                    print(f"[eval  step={step:7d}] {evaluator.name}: " +
-                          "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()]))
+                    print(
+                        f"[eval  step={step:7d}] {evaluator.name}: "
+                        + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
+                    )
 
             # Save checkpoint
             if step % self.config.save_interval == 0:
@@ -631,14 +611,14 @@ class Trainer:
         if self.evaluators:
             for evaluator in self.evaluators:
                 eval_metrics = evaluator.evaluate(
-                    self.state,
-                    self.compute_loss,
-                    self.config.max_steps
+                    self.state, self.compute_loss, self.config.max_steps
                 )
                 if self.logger:
                     self.logger.log(eval_metrics, step=self.config.max_steps)
-                print(f"[final eval] {evaluator.name}: " +
-                      "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()]))
+                print(
+                    f"[final eval] {evaluator.name}: "
+                    + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
+                )
 
         # Save final checkpoint (only if not already saved)
         if self.config.max_steps % self.config.save_interval != 0:
@@ -665,15 +645,15 @@ class Trainer:
         checkpointer.save(
             str(ckpt_dir / f"step_{step}"),  # Orbax requires absolute path as string
             {
-                'state': state,
-                'step': step,
-                'config': self.config.to_dict(),  # Convert Config to dict
-                'rng': self.rng,
-            }
+                "state": state,
+                "step": step,
+                "config": self.config.to_dict(),  # Convert Config to dict
+                "rng": self.rng,
+            },
         )
         print(f"✓ Checkpoint saved at step {step} to {ckpt_dir / f'step_{step}'}")
 
-    def load_checkpoint(self, step = None) -> int:
+    def load_checkpoint(self, step=None) -> int:
         """
         Load checkpoint from step (or latest if None).
 
@@ -695,8 +675,8 @@ class Trainer:
         checkpointer = ocp.PyTreeCheckpointer()
         restored = checkpointer.restore(str(ckpt_dir / f"step_{step}"))
 
-        self.state = restored['state']
-        self.rng = restored['rng']
+        self.state = restored["state"]
+        self.rng = restored["rng"]
 
         # Replicate if multi-device
         if self.num_devices > 1:
@@ -734,7 +714,7 @@ class Trainer:
                 "num_devices": self.num_devices,
                 "device_type": self.device_type,
                 "max_steps": self.config.max_steps,
-            }
+            },
         )
 
         # Log code
@@ -748,10 +728,7 @@ class Trainer:
 
     def replicate(self, tree):
         """Copy a pytree to all devices."""
-        return jax.tree_util.tree_map(
-            lambda x: jnp.array([x] * self.num_devices),
-            tree
-        )
+        return jax.tree_util.tree_map(lambda x: jnp.array([x] * self.num_devices), tree)
 
     def unreplicate(self, tree):
         """Take device 0's copy (all devices hold same values after pmean)."""

@@ -1,11 +1,11 @@
 """Integration test for end-to-end training pipeline."""
 
+
 import pytest
-from pathlib import Path
 
 from janogpt import GPT, Config, Trainer
-from janogpt.utils import DummyDataLoader
 from janogpt.logger import ConsoleLogger, DatasetEvaluator
+from janogpt.utils import DummyDataLoader
 
 
 @pytest.fixture
@@ -106,12 +106,13 @@ class TestTrainingPipeline:
                 break
 
             import jax.numpy as jnp
+
             batch_jax = {k: jnp.array(v) for k, v in batch.items()}
             metrics = trainer._train_step(batch_jax)
 
             if step == 1:
-                initial_loss = float(metrics['loss'])
-            final_loss = float(metrics['loss'])
+                initial_loss = float(metrics["loss"])
+            final_loss = float(metrics["loss"])
 
         # Loss should decrease significantly
         assert final_loss < initial_loss
@@ -129,6 +130,7 @@ class TestTrainingPipeline:
         assert isinstance(eval_loss, float)
         assert eval_loss > 0
         import jax.numpy as jnp
+
         assert jnp.isfinite(eval_loss)
 
     def test_checkpointing_workflow(self, smoke_config, smoke_dataloaders, tmp_path):
@@ -150,6 +152,7 @@ class TestTrainingPipeline:
             if step > 3:
                 break
             import jax.numpy as jnp
+
             batch_jax = {k: jnp.array(v) for k, v in batch.items()}
             trainer1._train_step(batch_jax)
 
@@ -168,6 +171,7 @@ class TestTrainingPipeline:
 
         # Parameters should match
         import jax.numpy as jnp
+
         for k in trainer1.state.params.keys():
             if trainer1.num_devices > 1:
                 # Unreplicate if multi-device
@@ -201,8 +205,7 @@ class TestMultiDeviceTraining:
         assert trainer.num_devices == jax.local_device_count()
 
     @pytest.mark.skipif(
-        lambda: __import__('jax').local_device_count() < 2,
-        reason="Requires multiple devices"
+        lambda: __import__("jax").local_device_count() < 2, reason="Requires multiple devices"
     )
     def test_multi_device_training(self, smoke_config, smoke_dataloaders):
         """Test training works on multiple devices."""
@@ -216,11 +219,12 @@ class TestMultiDeviceTraining:
             if step > 3:
                 break
             import jax.numpy as jnp
+
             batch_jax = {k: jnp.array(v) for k, v in batch.items()}
             metrics = trainer._train_step(batch_jax)
 
-            assert 'loss' in metrics
-            assert jnp.isfinite(metrics['loss'])
+            assert "loss" in metrics
+            assert jnp.isfinite(metrics["loss"])
 
 
 class TestConfigIntegration:
@@ -252,7 +256,7 @@ class TestConfigIntegration:
             },
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config_data, f)
 
         # Load config
@@ -260,6 +264,7 @@ class TestConfigIntegration:
 
         # Create data loader
         from janogpt.utils import DummyDataLoader
+
         train_loader = DummyDataLoader(
             batch_size=config.micro_batch_size,
             seq_len=config.seq_len,
@@ -274,6 +279,7 @@ class TestConfigIntegration:
             if step > config.max_steps:
                 break
             import jax.numpy as jnp
+
             batch_jax = {k: jnp.array(v) for k, v in batch.items()}
             trainer._train_step(batch_jax)
 

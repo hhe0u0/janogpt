@@ -1,8 +1,6 @@
 """Unit tests for Config."""
 
-import pytest
 import json
-from pathlib import Path
 
 from janogpt.config import Config
 
@@ -43,12 +41,12 @@ class TestConfigSerialization:
         config_dict = config.to_dict()
 
         assert isinstance(config_dict, dict)
-        assert 'model' in config_dict
-        assert config_dict['model']['num_blocks'] == 6
-        assert config_dict['model']['emb_dim'] == 384
-        assert config_dict['model']['num_heads'] == 6
-        assert 'optimizer' in config_dict
-        assert config_dict['optimizer']['learning_rate'] == 3e-4
+        assert "model" in config_dict
+        assert config_dict["model"]["num_blocks"] == 6
+        assert config_dict["model"]["emb_dim"] == 384
+        assert config_dict["model"]["num_heads"] == 6
+        assert "optimizer" in config_dict
+        assert config_dict["optimizer"]["learning_rate"] == 3e-4
 
     def test_from_json(self, tmp_path):
         """Test loading config from JSON file."""
@@ -68,7 +66,7 @@ class TestConfigSerialization:
             },
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config_data, f)
 
         config = Config.from_json(str(config_file))
@@ -93,7 +91,7 @@ class TestConfigSerialization:
             },
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config_data, f)
 
         config = Config.from_json(str(config_file))
@@ -118,9 +116,9 @@ class TestConfigSerialization:
         with open(config_file) as f:
             loaded = json.load(f)
 
-        assert loaded['model']['num_blocks'] == 6
-        assert loaded['model']['emb_dim'] == 384
-        assert loaded['training']['max_steps'] == 5000
+        assert loaded["model"]["num_blocks"] == 6
+        assert loaded["model"]["emb_dim"] == 384
+        assert loaded["training"]["max_steps"] == 5000
 
     def test_round_trip(self, tmp_path):
         """Test save and load produces same config."""
@@ -220,7 +218,7 @@ class TestConfigEdgeCases:
             },
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config_data, f)
 
         config = Config.from_json(str(config_file))
@@ -254,7 +252,7 @@ class TestConfigEdgeCases:
             },
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config_data, f)
 
         config = Config.from_json(str(config_file))

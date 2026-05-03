@@ -24,7 +24,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 import tiktoken
 
@@ -60,32 +59,26 @@ def load_checkpoint(checkpoint_path: str):
     restored = checkpointer.restore(checkpoint_path)
 
     # Reconstruct config
-    config = Config(**restored['config'])
+    config = Config(**restored["config"])
 
     # Create model
     model = GPT(config)
 
-    return model, restored['state'].params, config
+    return model, restored["state"].params, config
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate text with JanoGPT')
-    parser.add_argument('--checkpoint', type=str,
-                        help='Path to checkpoint directory')
-    parser.add_argument('--pretrained', action='store_true',
-                        help='Use pretrained HuggingFace GPT2')
-    parser.add_argument('--prompt', type=str, default="Hello, I am",
-                        help='Text prompt')
-    parser.add_argument('--max_tokens', type=int, default=50,
-                        help='Maximum tokens to generate')
-    parser.add_argument('--temperature', type=float, default=0.8,
-                        help='Sampling temperature')
-    parser.add_argument('--top_k', type=int, default=50,
-                        help='Top-k sampling')
-    parser.add_argument('--seed', type=int, default=42,
-                        help='Random seed')
-    parser.add_argument('--interactive', action='store_true',
-                        help='Interactive mode - enter prompts continuously')
+    parser = argparse.ArgumentParser(description="Generate text with JanoGPT")
+    parser.add_argument("--checkpoint", type=str, help="Path to checkpoint directory")
+    parser.add_argument("--pretrained", action="store_true", help="Use pretrained HuggingFace GPT2")
+    parser.add_argument("--prompt", type=str, default="Hello, I am", help="Text prompt")
+    parser.add_argument("--max_tokens", type=int, default=50, help="Maximum tokens to generate")
+    parser.add_argument("--temperature", type=float, default=0.8, help="Sampling temperature")
+    parser.add_argument("--top_k", type=int, default=50, help="Top-k sampling")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument(
+        "--interactive", action="store_true", help="Interactive mode - enter prompts continuously"
+    )
     args = parser.parse_args()
 
     if not args.checkpoint and not args.pretrained:
@@ -120,13 +113,15 @@ def main():
                 if not prompt:
                     continue
 
-                if prompt.lower() in ['quit', 'exit', 'q']:
+                if prompt.lower() in ["quit", "exit", "q"]:
                     print("Goodbye!")
                     break
 
-                if prompt.lower() == 'config':
-                    print(f"Settings: max_tokens={args.max_tokens}, "
-                          f"temperature={args.temperature}, top_k={args.top_k}")
+                if prompt.lower() == "config":
+                    print(
+                        f"Settings: max_tokens={args.max_tokens}, "
+                        f"temperature={args.temperature}, top_k={args.top_k}"
+                    )
                     continue
 
                 # Generate
@@ -141,7 +136,7 @@ def main():
                     max_new_tokens=args.max_tokens,
                     temperature=args.temperature,
                     top_k=args.top_k,
-                    rng_key=rng_key
+                    rng_key=rng_key,
                 )
 
                 # Decode and print
@@ -156,7 +151,7 @@ def main():
 
     # Single prompt mode
     prompt_tokens = np.array(enc.encode(args.prompt), dtype=np.int32)
-    print(f"\nPrompt: \"{args.prompt}\"")
+    print(f'\nPrompt: "{args.prompt}"')
     print(f"Generating {args.max_tokens} tokens with temperature={args.temperature}...")
 
     # Generate
@@ -168,7 +163,7 @@ def main():
         max_new_tokens=args.max_tokens,
         temperature=args.temperature,
         top_k=args.top_k,
-        rng_key=rng_key
+        rng_key=rng_key,
     )
 
     # Decode
@@ -178,5 +173,5 @@ def main():
     print("=" * 80)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main() or 0)

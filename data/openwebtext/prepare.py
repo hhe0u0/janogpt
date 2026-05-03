@@ -77,16 +77,18 @@ def download_dataset(output_dir: str, force: bool = False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Download OpenWebText dataset')
-    parser.add_argument('--output_dir', type=str, default='data/openwebtext',
-                        help='Output directory for dataset')
-    parser.add_argument('--force', action='store_true',
-                        help='Force re-download even if files exist')
+    parser = argparse.ArgumentParser(description="Download OpenWebText dataset")
+    parser.add_argument(
+        "--output_dir", type=str, default="data/openwebtext", help="Output directory for dataset"
+    )
+    parser.add_argument(
+        "--force", action="store_true", help="Force re-download even if files exist"
+    )
     args = parser.parse_args()
 
     success = download_dataset(args.output_dir, args.force)
     return 0 if success else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     exit(main())

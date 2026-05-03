@@ -14,7 +14,7 @@ def generate(
     max_new_tokens: int = 50,
     temperature: float = 1.0,
     top_k: int = 50,
-    rng_key = None
+    rng_key=None,
 ):
     """
     Generate tokens autoregressively with temperature sampling.
@@ -49,11 +49,7 @@ def generate(
 
         # Forward pass with current sequence
         input_batch = jnp.array([generated], dtype=jnp.int32)  # (1, current_len)
-        logits = model.apply(
-            {'params': params},
-            input_batch,
-            inference=True
-        )
+        logits = model.apply({"params": params}, input_batch, inference=True)
 
         # Get logits for last position
         next_token_logits = logits[0, -1, :]  # (vocab_size,)
@@ -65,7 +61,7 @@ def generate(
         if top_k > 0:
             top_k_logits, top_k_indices = jax.lax.top_k(next_token_logits, top_k)
             # Create mask for top-k
-            logits_filtered = jnp.full_like(next_token_logits, -float('inf'))
+            logits_filtered = jnp.full_like(next_token_logits, -float("inf"))
             logits_filtered = logits_filtered.at[top_k_indices].set(top_k_logits)
             next_token_logits = logits_filtered
 
@@ -83,12 +79,7 @@ def generate(
     return np.array(generated)
 
 
-def get_top_k_predictions(
-    model,
-    params,
-    input_tokens: np.ndarray,
-    k: int = 10
-) -> list:
+def get_top_k_predictions(model, params, input_tokens: np.ndarray, k: int = 10) -> list:
     """
     Get top-k next token predictions.
 
@@ -105,11 +96,7 @@ def get_top_k_predictions(
     input_batch = jnp.array(input_tokens[None, :])  # (1, seq_len)
 
     # Forward pass (inference mode)
-    logits = model.apply(
-        {'params': params},
-        input_batch,
-        inference=True
-    )
+    logits = model.apply({"params": params}, input_batch, inference=True)
 
     # Get logits for last position
     last_logits = logits[0, -1, :]  # (vocab_size,)

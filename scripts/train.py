@@ -15,17 +15,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import jax
+
 from janogpt import GPT, Config, Trainer
+from janogpt.logger import ConsoleLogger, DatasetEvaluator, MultiLogger, WandBLogger
 from janogpt.utils import DummyDataLoader, FileDataLoader
-from janogpt.logger import DatasetEvaluator, ConsoleLogger, WandBLogger, MultiLogger
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train JanoGPT')
-    parser.add_argument('--config', type=str, required=True,
-                        help='Path to config JSON file')
-    parser.add_argument('--no_wandb', action='store_true',
-                        help='Disable WandB logging')
+    parser = argparse.ArgumentParser(description="Train JanoGPT")
+    parser.add_argument("--config", type=str, required=True, help="Path to config JSON file")
+    parser.add_argument("--no_wandb", action="store_true", help="Disable WandB logging")
     return parser.parse_args()
 
 
@@ -46,11 +45,7 @@ def main():
 
     # Calculate effective batch
     num_devices = jax.local_device_count()
-    effective_batch = (
-        config.micro_batch_size
-        * config.gradient_accumulation_steps
-        * num_devices
-    )
+    effective_batch = config.micro_batch_size * config.gradient_accumulation_steps * num_devices
 
     # Create data loaders
     if config.dataloader_class == "DummyDataLoader":
@@ -75,14 +70,14 @@ def main():
             data_dir=config.data_dir,
             batch_size=effective_batch,
             seq_len=config.seq_len,
-            split='train',
+            split="train",
             seed=config.seed,
         )
         val_loader = FileDataLoader(
             data_dir=config.data_dir,
             batch_size=effective_batch,
             seq_len=config.seq_len,
-            split='val',
+            split="val",
             seed=config.seed + 1,
         )
 
@@ -99,11 +94,7 @@ def main():
 
     # Create trainer
     trainer = Trainer(
-        model=model,
-        config=config,
-        evaluators=evaluators,
-        logger=logger,
-        seed=config.seed
+        model=model, config=config, evaluators=evaluators, logger=logger, seed=config.seed
     )
 
     # Train
@@ -116,5 +107,5 @@ def main():
     print("\n✓ Training complete!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
