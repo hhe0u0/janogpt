@@ -30,30 +30,12 @@ Type your prompts and watch GPT-2 complete them in real-time. No model training 
 
 ### Installation
 
-**Option 1: Install from PyPI (Recommended)**
-
-```bash
-# Install janogpt
-pip install janogpt
-
-# For HuggingFace models (recommended to try immediately)
-pip install "janogpt[huggingface]"
-
-# For training (optional - requires dataset download)
-pip install "janogpt[data]"
-
-# For development
-pip install "janogpt[dev]"
-```
-
-**Option 2: Install from Source**
-
 ```bash
 # Clone repository
 git clone git@github.com:hhe0u0/janogpt.git
 cd janogpt
 
-# Install dependencies
+# Install base package
 pip install -e .
 
 # For HuggingFace models (recommended to try immediately)
@@ -61,7 +43,12 @@ pip install -e ".[huggingface]"
 
 # For training (optional - requires dataset download)
 pip install -e ".[data]"
+
+# For development
+pip install -e ".[dev]"
 ```
+
+**Note:** This package is not yet published to PyPI. Install from source as shown above.
 
 ### Try It Immediately with Pretrained GPT-2
 
