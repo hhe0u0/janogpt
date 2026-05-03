@@ -1,6 +1,6 @@
 # JanoGPT Test Suite
 
-Comprehensive test suite for janogpt with **67 passing tests** covering model architecture, training pipeline, and next-token prediction correctness.
+Comprehensive test suite for janogpt with **70 passing tests** covering model architecture, training pipeline, and next-token prediction correctness.
 
 ## Test Structure
 
@@ -214,10 +214,10 @@ pytest tests/ -k "causal" -v
 
 ### High Priority (Core Functionality)
 
-- [ ] **Fix failing trainer tests** (3 tests)
-  - `test_trainer_with_evaluators` - DataLoader parameter name
-  - `test_train_step_single_device` - Missing dropout_rngs parameter
-  - `test_loss_decreases_on_dummy_data` - Same issue
+- [x] **Fix failing trainer tests** (was 3 tests, now all passing!)
+
+
+
 
 - [ ] **Add gradient accumulation tests**
   - Verify token count: `micro_batch × accum_steps × devices × seq_len = 524,288`
@@ -308,12 +308,12 @@ pytest tests/ -k "causal" -v
 ```
 tests/unit/test_model.py .................... [10 passed]
 tests/unit/test_config.py ................... [14 passed]
-tests/unit/test_trainer.py .................. [14 passed, 3 failed]
+tests/unit/test_trainer.py .................. [17 passed]
 tests/unit/test_inference.py ................ [11 passed]
 tests/unit/test_utils.py .................... [18 passed]
 tests/unit/test_next_token_prediction.py .... [4 passed]
 
-TOTAL: 67 passed, 3 failed in ~45s
+TOTAL: 70 passed in ~40s
 ```
 
 ### Integration Tests (should complete in <5 minutes)
