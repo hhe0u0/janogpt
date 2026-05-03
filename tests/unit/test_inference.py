@@ -240,7 +240,7 @@ class TestGenerationEdgeCases:
 
         # All tokens should be valid
         for token in generated:
-            assert 0 <= token < tiny_config.voc_size
+            assert 0 <= token < tiny_config.vocab_size
 
     def test_generate_with_temperature_zero(self, tiny_model_and_params):
         """Test generation with very low temperature (greedy)."""

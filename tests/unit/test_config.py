@@ -20,7 +20,7 @@ class TestConfigDefaults:
         assert config.emb_dim > 0
         assert config.num_heads > 0
         assert config.seq_len > 0
-        assert config.voc_size > 0
+        assert config.vocab_size > 0
 
         # Training hyperparameters
         assert config.learning_rate > 0
@@ -118,9 +118,9 @@ class TestConfigSerialization:
         with open(config_file) as f:
             loaded = json.load(f)
 
-        assert loaded['num_blocks'] == 6
-        assert loaded['emb_dim'] == 384
-        assert loaded['max_steps'] == 5000
+        assert loaded['model']['num_blocks'] == 6
+        assert loaded['model']['emb_dim'] == 384
+        assert loaded['training']['max_steps'] == 5000
 
     def test_round_trip(self, tmp_path):
         """Test save and load produces same config."""
@@ -166,9 +166,9 @@ class TestConfigValidation:
         assert config.min_learning_rate == 6e-5
 
     def test_gradient_accumulation_default(self):
-        """Test gradient accumulation defaults to 1."""
+        """Test gradient accumulation defaults to 16 (as per Config)."""
         config = Config()
-        assert config.gradient_accumulation_steps == 1
+        assert config.gradient_accumulation_steps == 16
 
 
 class TestConfigComputedProperties:

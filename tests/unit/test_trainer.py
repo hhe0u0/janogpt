@@ -41,7 +41,7 @@ def dummy_dataloader(tiny_config):
     return DummyDataLoader(
         batch_size=tiny_config.micro_batch_size * tiny_config.gradient_accumulation_steps,
         seq_len=tiny_config.seq_len,
-        vocab_size=tiny_config.voc_size,
+        vocab_size=tiny_config.vocab_size,
     )
 
 

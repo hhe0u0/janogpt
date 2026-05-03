@@ -714,7 +714,10 @@ class Trainer:
 
     def replicate(self, tree):
         """Copy a pytree to all devices."""
-        return jax.device_put_replicated(tree, jax.local_devices())
+        return jax.tree_util.tree_map(
+            lambda x: jnp.array([x] * self.num_devices),
+            tree
+        )
 
     def unreplicate(self, tree):
         """Take device 0's copy (all devices hold same values after pmean)."""

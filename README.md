@@ -4,6 +4,18 @@ A clean, educational GPT-2 implementation in JAX/Flax with production-quality tr
 
 **Focus:** Understand transformers deeply by building GPT-2 from scratch in JAX.
 
+## 🚀 Try It Now (No Training Required!)
+
+```bash
+# Install dependencies
+pip install -e ".[huggingface]"
+
+# Chat with GPT-2 interactively
+python scripts/generate.py --pretrained --interactive
+```
+
+Type your prompts and watch GPT-2 complete them in real-time. No model training needed—uses pretrained weights from HuggingFace!
+
 ## Features
 
 - ✅ **Pure JAX/Flax implementation** - Clean, functional code
@@ -26,11 +38,50 @@ cd janogpt
 # Install dependencies
 pip install -e .
 
-# Install optional dependencies
-pip install -e ".[data,huggingface]"  # For dataset download and HF models
+# For HuggingFace models (recommended to try immediately)
+pip install -e ".[huggingface]"
+
+# For training (optional - requires dataset download)
+pip install -e ".[data]"
 ```
 
-### Download Data
+### Try It Immediately with Pretrained GPT-2
+
+**No training required!** Load pretrained weights from HuggingFace and start generating text:
+
+```bash
+# Install HuggingFace dependencies
+pip install -e ".[huggingface]"
+
+# Interactive mode - chat with GPT-2
+python scripts/generate.py --pretrained --interactive
+
+# Single prompt mode
+python scripts/generate.py \
+  --pretrained \
+  --prompt "The meaning of life is" \
+  --max_tokens 100 \
+  --temperature 0.8
+```
+
+**Interactive mode example:**
+```
+> Once upon a time
+Once upon a time, there was a young girl who lived in a small village...
+
+> The future of AI is
+The future of AI is bright. Machine learning will revolutionize...
+
+> config
+Settings: max_tokens=50, temperature=0.8, top_k=50
+
+> quit
+Goodbye!
+```
+
+### Train Your Own Model
+
+#### 1. Download Data
 
 ```bash
 # Install kagglehub
@@ -42,7 +93,7 @@ python data/openwebtext/prepare.py
 
 See [data/openwebtext/README.md](data/openwebtext/README.md) for details.
 
-### Train
+#### 2. Train
 
 ```bash
 # Quick smoke test (< 1 minute)
@@ -58,21 +109,19 @@ python scripts/train.py --config configs/train_4gpu_a100.json
 python scripts/train.py --config configs/train_1gpu_a100.json --no_wandb
 ```
 
-### Generate Text
+#### 3. Generate from Your Checkpoint
 
 ```bash
-# Generate from pretrained HuggingFace GPT-2
-python scripts/generate.py \
-  --pretrained \
-  --prompt "Once upon a time" \
-  --max_tokens 100 \
-  --temperature 0.8
-
-# Generate from your trained checkpoint
+# Single prompt
 python scripts/generate.py \
   --checkpoint output_1gpu/checkpoints/step_10000 \
   --prompt "Hello, I am" \
   --max_tokens 50
+
+# Interactive mode
+python scripts/generate.py \
+  --checkpoint output_1gpu/checkpoints/step_10000 \
+  --interactive
 ```
 
 ### Resume Training
@@ -227,11 +276,80 @@ Disable WandB: `python scripts/train.py --config ... --no_wandb`
 
 ## Text Generation
 
+### Interactive Mode (Recommended)
+
+**The easiest way to use the model!** Chat with GPT-2 in real-time:
+
+```bash
+# With pretrained HuggingFace GPT-2 (no training needed!)
+python scripts/generate.py --pretrained --interactive
+
+# With your trained checkpoint
+python scripts/generate.py \
+  --checkpoint output_1gpu/checkpoints/step_10000 \
+  --interactive
+
+# Adjust creativity
+python scripts/generate.py \
+  --pretrained \
+  --interactive \
+  --temperature 0.9 \    # Higher = more creative
+  --max_tokens 100       # Longer completions
+```
+
+**Interactive commands:**
+- Type any prompt and press Enter to generate
+- `config` - Show current settings
+- `quit` or `exit` - Exit interactive mode
+- Ctrl+C - Exit
+
+**Example session:**
+```
+> The meaning of life is
+The meaning of life is to find happiness and purpose in our daily experiences...
+
+> Write a haiku about AI
+Write a haiku about AI:
+Silicon minds dream
+Learning patterns from the world
+Human thoughts reborn
+
+> In a world where robots
+In a world where robots have become sentient, humanity faces its greatest challenge...
+
+> config
+Settings: max_tokens=50, temperature=0.8, top_k=50
+
+> quit
+Goodbye!
+```
+
+### Single Prompt Mode
+
+Generate text from a single prompt:
+
+```bash
+# With pretrained HuggingFace GPT-2
+python scripts/generate.py \
+  --pretrained \
+  --prompt "Once upon a time" \
+  --max_tokens 100 \
+  --temperature 0.8
+
+# With your trained checkpoint
+python scripts/generate.py \
+  --checkpoint output_1gpu/checkpoints/step_50000 \
+  --prompt "The future of AI is" \
+  --max_tokens 100
+```
+
 ### Sampling Parameters
+
+Control the generation style:
 
 ```bash
 python scripts/generate.py \
-  --checkpoint output_1gpu/checkpoints/step_50000 \
+  --pretrained \
   --prompt "Once upon a time" \
   --max_tokens 100 \          # Number of tokens to generate
   --temperature 0.8 \          # Higher = more random (0.7-1.0 typical)
@@ -240,73 +358,192 @@ python scripts/generate.py \
 ```
 
 **Temperature:**
-- `0.7` - More focused, coherent
-- `0.8-0.9` - Balanced creativity
+- `0.7` - More focused, coherent, deterministic
+- `0.8-0.9` - Balanced creativity (recommended)
 - `1.0+` - Very creative, possibly incoherent
+- Lower = safer, more repetitive
+- Higher = riskier, more diverse
 
 **Top-k:**
-- `40-50` - Standard setting
-- Lower = more deterministic
-- Higher = more diverse
+- `40-50` - Standard setting (recommended)
+- `20-30` - More focused, less diverse
+- `100+` - More diverse, potentially incoherent
+- Limits sampling to top-k most likely tokens
 
-### Using Pretrained Models
+**Max tokens:**
+- `50` - Short completion (1-2 sentences)
+- `100` - Medium paragraph
+- `200+` - Long-form generation
 
-Load HuggingFace GPT-2 weights directly:
+### Using Pretrained HuggingFace Models
+
+Load GPT-2 weights from HuggingFace and use immediately (no training required):
 
 ```bash
-# Requires: pip install transformers torch
+# Install dependencies
+pip install transformers torch
+
+# Generate text with pretrained GPT-2
 python scripts/generate.py \
   --pretrained \
   --prompt "The future of AI is" \
   --max_tokens 100
+
+# Interactive mode (recommended!)
+python scripts/generate.py --pretrained --interactive
 ```
 
-This downloads GPT-2 124M from HuggingFace and converts weights to JAX format automatically.
+**What happens:**
+1. Downloads GPT-2 124M from HuggingFace (first time only, ~500MB)
+2. Automatically converts PyTorch weights to JAX format
+3. Ready to generate text immediately
+4. Weights cached locally for future use
+
+**Supported models:**
+- `gpt2` (124M parameters) - Default, good for most uses
+- `gpt2-medium` (355M) - Better quality, slower
+- `gpt2-large` (774M) - High quality, requires more memory
+- `gpt2-xl` (1.5B) - Best quality, requires 16GB+ GPU
+
+To use larger models, modify `pretrained/huggingface/loader.py` and change the model name.
 
 ## Loading Pretrained Weights
 
-### From HuggingFace
+### From HuggingFace (Easiest)
+
+**Command-line (recommended):**
+
+```bash
+# Interactive mode - just chat with GPT-2!
+python scripts/generate.py --pretrained --interactive
+
+# Or single prompt
+python scripts/generate.py \
+  --pretrained \
+  --prompt "Complete this sentence: The key to success is" \
+  --max_tokens 50
+```
+
+**Python API:**
 
 ```python
 from pretrained.huggingface.loader import load_hf_gpt2_weights
 from janogpt import GPT, Config
+from janogpt.inference import generate
+import tiktoken
+import jax
+import numpy as np
 
 # Create config matching HF GPT-2
 config = Config(
-    voc_size=50257,  # HF vocab size
+    voc_size=50257,  # HF vocab size (different from trained model!)
     num_blocks=12,
     emb_dim=768,
     num_heads=12,
     seq_len=1024,
 )
 
+# Load pretrained weights from HuggingFace
 model = GPT(config)
 params = load_hf_gpt2_weights(model, config)
 
-# Now use params for generation
+# Tokenize your prompt
+enc = tiktoken.get_encoding("gpt2")
+prompt = "The meaning of life is"
+prompt_tokens = np.array(enc.encode(prompt), dtype=np.int32)
+
+# Generate text
+rng_key = jax.random.key(42)
+generated = generate(
+    model,
+    params,
+    prompt_tokens,
+    max_new_tokens=50,
+    temperature=0.8,
+    top_k=50,
+    rng_key=rng_key
+)
+
+# Decode and print
+text = enc.decode(generated.tolist())
+print(text)
 ```
 
-Supported models:
-- `gpt2` (124M)
-- `gpt2-medium` (355M)
-- `gpt2-large` (774M)
-- `gpt2-xl` (1.5B)
+**Supported HuggingFace models:**
+- `gpt2` (124M) - Default, fast, good quality
+- `gpt2-medium` (355M) - Better quality, slower
+- `gpt2-large` (774M) - High quality, requires more memory
+- `gpt2-xl` (1.5B) - Best quality, requires 16GB+ GPU
 
-### From Checkpoint
+To use larger models, modify `pretrained/huggingface/loader.py`:
+```python
+# Change this line
+model_name = "gpt2-medium"  # or "gpt2-large", "gpt2-xl"
+```
+
+### From Your Trained Checkpoint
+
+**Command-line:**
+
+```bash
+# Interactive mode
+python scripts/generate.py \
+  --checkpoint output_1gpu/checkpoints/step_10000 \
+  --interactive
+
+# Single prompt
+python scripts/generate.py \
+  --checkpoint output_1gpu/checkpoints/step_50000 \
+  --prompt "Hello, I am" \
+  --max_tokens 50
+```
+
+**Python API:**
 
 ```python
 import orbax.checkpoint as ocp
 from janogpt import GPT, Config
+from janogpt.inference import generate
+import tiktoken
+import jax
+import numpy as np
 
+# Load checkpoint
 checkpointer = ocp.PyTreeCheckpointer()
 restored = checkpointer.restore("output_1gpu/checkpoints/step_10000")
 
+# Reconstruct model
 config = Config(**restored['config'])
 model = GPT(config)
 params = restored['state'].params
 
-# Use for inference or resume training
+# Generate text
+enc = tiktoken.get_encoding("gpt2")
+prompt_tokens = np.array(enc.encode("Hello, I am"), dtype=np.int32)
+rng_key = jax.random.key(42)
+
+generated = generate(
+    model,
+    params,
+    prompt_tokens,
+    max_new_tokens=50,
+    temperature=0.8,
+    top_k=50,
+    rng_key=rng_key
+)
+
+text = enc.decode(generated.tolist())
+print(text)
 ```
+
+**What's in a checkpoint:**
+- Model weights (`state.params`)
+- Optimizer state (Adam momentum, variance)
+- Training step count
+- RNG state
+- Full training config
+
+You can resume training or just use the weights for inference.
 
 ## Development & Code Quality
 

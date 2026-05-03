@@ -33,7 +33,7 @@ def trained_model_params(tiny_config):
     loader = DummyDataLoader(
         batch_size=4,
         seq_len=tiny_config.seq_len,
-        vocab_size=tiny_config.voc_size,
+        vocab_size=tiny_config.vocab_size,
     )
 
     # Train 20 steps to get some signal
@@ -348,7 +348,7 @@ class TestGenerationAfterTraining:
         loader = DummyDataLoader(
             batch_size=4,
             seq_len=tiny_config.seq_len,
-            vocab_size=tiny_config.voc_size,
+            vocab_size=tiny_config.vocab_size,
         )
 
         # Get fixed batch
@@ -374,4 +374,4 @@ class TestGenerationAfterTraining:
 
         # Should produce valid tokens
         assert len(generated) == len(prompt) + 10
-        assert all(0 <= t < tiny_config.voc_size for t in generated)
+        assert all(0 <= t < tiny_config.vocab_size for t in generated)

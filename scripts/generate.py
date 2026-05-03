@@ -3,8 +3,17 @@
 Text generation script for JanoGPT.
 
 Usage:
-    python scripts/generate.py --checkpoint output/checkpoints/step_10000 --prompt "Hello, I am"
+    # Interactive mode with pretrained GPT-2 (recommended!)
+    python scripts/generate.py --pretrained --interactive
+
+    # Single prompt with pretrained GPT-2
     python scripts/generate.py --pretrained --prompt "Once upon a time"
+
+    # Interactive mode with your trained checkpoint
+    python scripts/generate.py --checkpoint output/checkpoints/step_10000 --interactive
+
+    # Single prompt with your checkpoint
+    python scripts/generate.py --checkpoint output/checkpoints/step_10000 --prompt "Hello, I am"
 """
 
 import argparse
@@ -75,6 +84,8 @@ def main():
                         help='Top-k sampling')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed')
+    parser.add_argument('--interactive', action='store_true',
+                        help='Interactive mode - enter prompts continuously')
     args = parser.parse_args()
 
     if not args.checkpoint and not args.pretrained:
@@ -91,8 +102,59 @@ def main():
 
     print("✓ Model loaded")
 
-    # Tokenize prompt
+    # Get tokenizer
     enc = tiktoken.get_encoding("gpt2")
+
+    # Interactive mode
+    if args.interactive:
+        print("\n" + "=" * 80)
+        print("Interactive Mode - Type prompts and press Enter")
+        print("Commands: 'quit' or 'exit' to exit, 'config' to see settings")
+        print("=" * 80)
+
+        seed = args.seed
+        while True:
+            try:
+                prompt = input("\n> ").strip()
+
+                if not prompt:
+                    continue
+
+                if prompt.lower() in ['quit', 'exit', 'q']:
+                    print("Goodbye!")
+                    break
+
+                if prompt.lower() == 'config':
+                    print(f"Settings: max_tokens={args.max_tokens}, "
+                          f"temperature={args.temperature}, top_k={args.top_k}")
+                    continue
+
+                # Generate
+                prompt_tokens = np.array(enc.encode(prompt), dtype=np.int32)
+                rng_key = jax.random.key(seed)
+                seed += 1  # Change seed each time for variety
+
+                generated = generate(
+                    model,
+                    params,
+                    prompt_tokens,
+                    max_new_tokens=args.max_tokens,
+                    temperature=args.temperature,
+                    top_k=args.top_k,
+                    rng_key=rng_key
+                )
+
+                # Decode and print
+                text = enc.decode(generated.tolist())
+                print("\n" + text + "\n")
+
+            except (KeyboardInterrupt, EOFError):
+                print("\nGoodbye!")
+                break
+
+        return 0
+
+    # Single prompt mode
     prompt_tokens = np.array(enc.encode(args.prompt), dtype=np.int32)
     print(f"\nPrompt: \"{args.prompt}\"")
     print(f"Generating {args.max_tokens} tokens with temperature={args.temperature}...")

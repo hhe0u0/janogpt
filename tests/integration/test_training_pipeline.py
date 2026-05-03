@@ -40,13 +40,13 @@ def smoke_dataloaders(smoke_config):
     train_loader = DummyDataLoader(
         batch_size=smoke_config.micro_batch_size * smoke_config.gradient_accumulation_steps,
         seq_len=smoke_config.seq_len,
-        vocab_size=smoke_config.voc_size,
+        vocab_size=smoke_config.vocab_size,
     )
 
     eval_loader = DummyDataLoader(
         batch_size=smoke_config.micro_batch_size * smoke_config.gradient_accumulation_steps,
         seq_len=smoke_config.seq_len,
-        vocab_size=smoke_config.voc_size,
+        vocab_size=smoke_config.vocab_size,
     )
 
     return train_loader, eval_loader
@@ -263,7 +263,7 @@ class TestConfigIntegration:
         train_loader = DummyDataLoader(
             batch_size=config.micro_batch_size,
             seq_len=config.seq_len,
-            vocab_size=config.voc_size,
+            vocab_size=config.vocab_size,
         )
 
         # Train
