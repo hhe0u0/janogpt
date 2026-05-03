@@ -297,32 +297,63 @@ python scripts/generate.py \
   --max_tokens 100       # Longer completions
 ```
 
+**Interactive features:**
+- 🌈 **Colored output** - Beautiful CLI interface with syntax highlighting
+- 🚀 **Streaming generation** - See tokens appear in real-time
+- 📊 **Performance metrics** - Live tokens/sec display
+- ⚙️ **Dynamic settings** - Adjust parameters without restarting
+
 **Interactive commands:**
 - Type any prompt and press Enter to generate
 - `config` - Show current settings
+- `set <param> <value>` - Change generation parameters
+  - `set max_tokens 100` - Set max output length
+  - `set temperature 0.9` - Adjust creativity
+  - `set top_k 40` - Adjust diversity
 - `quit` or `exit` - Exit interactive mode
 - Ctrl+C - Exit
 
 **Example session:**
 ```
+================================================================================
+🤖 JanoGPT Interactive Mode
+================================================================================
+Model: seq_len=1024, voc_size=50257
+Commands: 'quit', 'config', 'set <param> <value>'
+================================================================================
+
 > The meaning of life is
 The meaning of life is to find happiness and purpose in our daily experiences...
+[25 tokens, 12.3 tok/s]
+
+> set max_tokens 100
+✓ Set max_tokens = 100
+
+> set temperature 0.9
+✓ Set temperature = 0.9
 
 > Write a haiku about AI
 Write a haiku about AI:
 Silicon minds dream
 Learning patterns from the world
 Human thoughts reborn
-
-> In a world where robots
-In a world where robots have become sentient, humanity faces its greatest challenge...
+[18 tokens, 15.7 tok/s]
 
 > config
-Settings: max_tokens=50, temperature=0.8, top_k=50
+Current Settings:
+  max_tokens   = 100
+  temperature  = 0.9
+  top_k        = 50
+  (model seq_len = 1024)
 
 > quit
 Goodbye!
 ```
+
+**Error handling:**
+- Automatic validation of `max_tokens` against model's `seq_len`
+- Warning if prompt + max_tokens exceeds context window
+- Clear error messages with suggestions
 
 ### Single Prompt Mode
 

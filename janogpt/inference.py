@@ -7,6 +7,38 @@ import jax.numpy as jnp
 import numpy as np
 
 
+def sample_next_token(logits, temperature=1.0, top_k=50, rng_key=None):
+    """
+    Sample next token from logits with temperature and top-k filtering.
+
+    Args:
+        logits: Logits for next token (voc_size,)
+        temperature: Sampling temperature
+        top_k: Top-k filtering (0 = no filtering)
+        rng_key: Random key
+
+    Returns:
+        Next token (scalar)
+    """
+    if rng_key is None:
+        rng_key = jax.random.key(42)
+
+    # Apply temperature
+    logits = logits / temperature
+
+    # Apply top-k filtering
+    if top_k > 0:
+        top_k_logits, top_k_indices = jax.lax.top_k(logits, top_k)
+        # Create mask for top-k
+        logits_filtered = jnp.full_like(logits, -float("inf"))
+        logits_filtered = logits_filtered.at[top_k_indices].set(top_k_logits)
+        logits = logits_filtered
+
+    # Sample from distribution
+    next_token = jax.random.categorical(rng_key, logits)
+    return next_token
+
+
 def generate(
     model,
     params,
@@ -54,20 +86,9 @@ def generate(
         # Get logits for last position
         next_token_logits = logits[0, -1, :]  # (vocab_size,)
 
-        # Apply temperature
-        next_token_logits = next_token_logits / temperature
-
-        # Apply top-k filtering
-        if top_k > 0:
-            top_k_logits, top_k_indices = jax.lax.top_k(next_token_logits, top_k)
-            # Create mask for top-k
-            logits_filtered = jnp.full_like(next_token_logits, -float("inf"))
-            logits_filtered = logits_filtered.at[top_k_indices].set(top_k_logits)
-            next_token_logits = logits_filtered
-
-        # Sample from distribution
+        # Sample next token
         rng_key, sample_key = jax.random.split(rng_key)
-        next_token = jax.random.categorical(sample_key, next_token_logits)
+        next_token = sample_next_token(next_token_logits, temperature, top_k, sample_key)
 
         # Append to generated sequence
         generated.append(int(next_token))
