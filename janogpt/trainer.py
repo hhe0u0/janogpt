@@ -613,6 +613,27 @@ class Trainer:
         keys = jax.random.split(base, self.config.gradient_accumulation_steps)
         return keys
 
+    def cleanup(self):
+        """Cleanup resources (especially TPU)."""
+        try:
+            # Clear JAX caches and free TPU memory
+            jax.clear_caches()
+
+            # If using TPU, explicitly release resources
+            if jax.devices()[0].platform == 'tpu':
+                print("Releasing TPU resources...")
+                # Delete large objects
+                if hasattr(self, 'state'):
+                    del self.state
+                if hasattr(self, '_train_step_fn'):
+                    del self._train_step_fn
+                # Force garbage collection
+                import gc
+                gc.collect()
+                print("✓ TPU resources released")
+        except Exception as e:
+            print(f"Warning: Error during cleanup: {e}")
+
     def train(self, train_loader: Iterator, verbose_first_step: bool = False):
         """
         Main training loop.
@@ -635,138 +656,165 @@ class Trainer:
         print("\nStarting training...")
         print("=" * 80)
 
-        for step, batch in enumerate(train_loader, start=start_step + 1):
-            if step > self.config.max_steps:
-                break
+        try:
 
-            # Prepare batch
-            batch_jax = self._prepare_batch(batch)
+            for step, batch in enumerate(train_loader, start=start_step + 1):
+                if step > self.config.max_steps:
+                    break
 
-            # Generate dropout RNGs
-            dropout_rngs = self._generate_dropout_rngs()
+                # Prepare batch
+                batch_jax = self._prepare_batch(batch)
 
-            # Train step
-            if step == 1:
-                print(f"[step {step}] Starting first train step...")
-                print(f"  - Effective batch: {self.effective_batch_size} seqs, {self.effective_batch_tokens/1e3:.0f}K tokens")
+                # Generate dropout RNGs
+                dropout_rngs = self._generate_dropout_rngs()
 
-                step_start = time.perf_counter()
+                # Train step
+                if step == 1:
+                    print(f"[step {step}] Starting first train step...")
+                    print(f"  - Effective batch: {self.effective_batch_size} seqs, {self.effective_batch_tokens/1e3:.0f}K tokens")
 
-                # Use verbose non-JIT version for first step if requested
-                if verbose_first_step and self.num_devices == 1:
-                    print(f"  - Running verbose (non-JIT) version to show progress...")
-                    self.state, metrics = self._train_step_single_verbose(
-                        self.state, batch_jax, dropout_rngs
-                    )
+                    step_start = time.perf_counter()
 
-                    step_time = time.perf_counter() - step_start
-                    print(f"[step {step}] ✓ First step complete!")
-                    print(f"  - Total time: {step_time:.1f}s")
-                    print(f"  - Loss: {float(metrics['loss']):.4f}")
-                    print(f"  - Now compiling optimized JIT version for subsequent steps...")
-                    print(f"  - This will take another 1-2 minutes...")
+                    # Use verbose non-JIT version for first step if requested
+                    if verbose_first_step and self.num_devices == 1:
+                        print(f"  - Running verbose (non-JIT) version to show progress...")
+                        self.state, metrics = self._train_step_single_verbose(
+                            self.state, batch_jax, dropout_rngs
+                        )
 
-                    # Now compile the fast JIT version for subsequent steps
-                    jit_start = time.perf_counter()
-                    self._train_step_fn(self.state, batch_jax, dropout_rngs)
-                    jit_time = time.perf_counter() - jit_start
-                    print(f"  ✓ JIT compilation complete ({jit_time:.1f}s)")
-                    print(f"  - Subsequent steps will be much faster (~{(step_time+jit_time)/20:.1f}s expected)")
-                    print()
-                else:
-                    # Standard first step (with JIT compilation happening inside)
-                    if self.num_devices > 1:
-                        print(f"  - Compiling for {self.num_devices} devices (this will take 1-3 min)...")
-                        if verbose_first_step:
-                            print(f"  - Note: Multi-device uses pmap, no micro-batch progress available")
-                            print(f"  - Use --verbose with single GPU to see detailed progress")
+                        step_time = time.perf_counter() - step_start
+                        print(f"[step {step}] ✓ First step complete!")
+                        print(f"  - Total time: {step_time:.1f}s")
+                        print(f"  - Loss: {float(metrics['loss']):.4f}")
+                        print(f"  - Now compiling optimized JIT version for subsequent steps...")
+                        print(f"  - This will take another 1-2 minutes...")
+
+                        # Now compile the fast JIT version for subsequent steps
+                        jit_start = time.perf_counter()
+                        self._train_step_fn(self.state, batch_jax, dropout_rngs)
+                        jit_time = time.perf_counter() - jit_start
+                        print(f"  ✓ JIT compilation complete ({jit_time:.1f}s)")
+                        print(f"  - Subsequent steps will be much faster (~{(step_time+jit_time)/20:.1f}s expected)")
+                        print()
                     else:
-                        print(f"  - Compiling training step (this will take 1-3 min)...")
-                        if verbose_first_step:
-                            print(f"  - Tip: --verbose flag shows micro-batch progress for single GPU")
+                        # Standard first step (with JIT compilation happening inside)
+                        if self.num_devices > 1:
+                            print(f"  - Compiling for {self.num_devices} devices (this will take 1-3 min)...")
+                            if verbose_first_step:
+                                print(f"  - Note: Multi-device uses pmap, no micro-batch progress available")
+                                print(f"  - Use --verbose with single GPU to see detailed progress")
+                        else:
+                            print(f"  - Compiling training step (this will take 1-3 min)...")
+                            if verbose_first_step:
+                                print(f"  - Tip: --verbose flag shows micro-batch progress for single GPU")
 
+                        self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
+
+                        step_time = time.perf_counter() - step_start
+                        print(f"[step {step}] ✓ First step complete!")
+                        print(f"  - Total time: {step_time:.1f}s (JIT compile + execution)")
+                        loss_val = float(metrics['loss']) if self.num_devices == 1 else float(metrics['loss'][0])
+                        print(f"  - Loss: {loss_val:.4f}")
+                        print(f"  - Subsequent steps will be much faster (~{step_time/10:.1f}s expected)")
+                        print()
+                else:
+                    # Normal JIT-compiled step for all subsequent steps
                     self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
 
-                    step_time = time.perf_counter() - step_start
-                    print(f"[step {step}] ✓ First step complete!")
-                    print(f"  - Total time: {step_time:.1f}s (JIT compile + execution)")
-                    loss_val = float(metrics['loss']) if self.num_devices == 1 else float(metrics['loss'][0])
-                    print(f"  - Loss: {loss_val:.4f}")
-                    print(f"  - Subsequent steps will be much faster (~{step_time/10:.1f}s expected)")
-                    print()
-            else:
-                # Normal JIT-compiled step for all subsequent steps
-                self.state, metrics = self._train_step_fn(self.state, batch_jax, dropout_rngs)
+                # Extract metrics (unreplicate if multi-device)
+                if self.num_devices > 1:
+                    metrics = {k: float(v[0]) for k, v in metrics.items()}
+                else:
+                    metrics = {k: float(v) for k, v in metrics.items()}
 
-            # Extract metrics (unreplicate if multi-device)
-            if self.num_devices > 1:
-                metrics = {k: float(v[0]) for k, v in metrics.items()}
-            else:
-                metrics = {k: float(v) for k, v in metrics.items()}
+                # Update EMA loss
+                loss = metrics["loss"]
+                loss_ema = loss if loss_ema is None else (ema_alpha * loss_ema + (1 - ema_alpha) * loss)
 
-            # Update EMA loss
-            loss = metrics["loss"]
-            loss_ema = loss if loss_ema is None else (ema_alpha * loss_ema + (1 - ema_alpha) * loss)
+                # Log metrics
+                if step % self.config.log_interval == 0:
+                    elapsed = time.perf_counter() - t0
+                    tokens_per_sec = step * self.effective_batch_tokens / elapsed
 
-            # Log metrics
-            if step % self.config.log_interval == 0:
-                elapsed = time.perf_counter() - t0
-                tokens_per_sec = step * self.effective_batch_tokens / elapsed
+                    log_dict = {
+                        "train/loss": loss,
+                        "train/loss_ema": loss_ema,
+                        "train/perplexity": metrics["perplexity"],
+                        "train/grad_norm": metrics["grad_norm"],
+                        "train/param_norm": metrics["param_norm"],
+                        "train/grad_to_param_ratio": metrics["grad_to_param_ratio"],
+                        "train/learning_rate": metrics["learning_rate"],
+                        "train/tokens_per_sec": tokens_per_sec,
+                        "system/step_time_ms": (elapsed / step) * 1000,
+                        "system/steps_per_sec": step / elapsed,
+                        "step": step,
+                    }
 
-                log_dict = {
-                    "train/loss": loss,
-                    "train/loss_ema": loss_ema,
-                    "train/perplexity": metrics["perplexity"],
-                    "train/grad_norm": metrics["grad_norm"],
-                    "train/param_norm": metrics["param_norm"],
-                    "train/grad_to_param_ratio": metrics["grad_to_param_ratio"],
-                    "train/learning_rate": metrics["learning_rate"],
-                    "train/tokens_per_sec": tokens_per_sec,
-                    "system/step_time_ms": (elapsed / step) * 1000,
-                    "system/steps_per_sec": step / elapsed,
-                    "step": step,
-                }
-
-                if self.logger:
-                    self.logger.log(log_dict, step=step)
-
-            # Run evaluators
-            if self.evaluators and step % self.config.eval_interval == 0:
-                for evaluator in self.evaluators:
-                    eval_metrics = evaluator.evaluate(self.state, self.compute_loss, step)
                     if self.logger:
-                        self.logger.log(eval_metrics, step=step)
+                        self.logger.log(log_dict, step=step)
+
+                # Run evaluators
+                if self.evaluators and step % self.config.eval_interval == 0:
+                    for evaluator in self.evaluators:
+                        eval_metrics = evaluator.evaluate(self.state, self.compute_loss, step)
+                        if self.logger:
+                            self.logger.log(eval_metrics, step=step)
+                        print(
+                            f"[eval  step={step:7d}] {evaluator.name}: "
+                            + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
+                        )
+
+                # Save checkpoint
+                if step % self.config.save_interval == 0:
+                    self.save_checkpoint(step)
+
+        except KeyboardInterrupt:
+            print("\n" + "=" * 80)
+            print("Training interrupted by user (Ctrl+C)")
+            current_step = int(self.state.step) if hasattr(self, 'state') else start_step
+            print(f"Saving checkpoint at step {current_step}...")
+            self.save_checkpoint(current_step)
+            print("✓ Checkpoint saved")
+            self.cleanup()
+            raise
+        except Exception as e:
+            print("\n" + "=" * 80)
+            print(f"Training failed with error: {e}")
+            current_step = int(self.state.step) if hasattr(self, 'state') else start_step
+            print(f"Saving checkpoint at step {current_step}...")
+            try:
+                self.save_checkpoint(current_step)
+                print("✓ Checkpoint saved")
+            except:
+                print("⚠️  Could not save checkpoint")
+            self.cleanup()
+            raise
+        finally:
+            # Final evaluation and checkpoint
+            print("=" * 80)
+            print("Training complete! Running final evaluation...")
+            if self.evaluators:
+                for evaluator in self.evaluators:
+                    eval_metrics = evaluator.evaluate(
+                        self.state, self.compute_loss, self.config.max_steps
+                    )
+                    if self.logger:
+                        self.logger.log(eval_metrics, step=self.config.max_steps)
                     print(
-                        f"[eval  step={step:7d}] {evaluator.name}: "
+                        f"[final eval] {evaluator.name}: "
                         + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
                     )
 
-            # Save checkpoint
-            if step % self.config.save_interval == 0:
-                self.save_checkpoint(step)
+            # Save final checkpoint (only if not already saved)
+            if self.config.max_steps % self.config.save_interval != 0:
+                self.save_checkpoint(self.config.max_steps)
 
-        # Final evaluation and checkpoint
-        print("=" * 80)
-        print("Training complete! Running final evaluation...")
-        if self.evaluators:
-            for evaluator in self.evaluators:
-                eval_metrics = evaluator.evaluate(
-                    self.state, self.compute_loss, self.config.max_steps
-                )
-                if self.logger:
-                    self.logger.log(eval_metrics, step=self.config.max_steps)
-                print(
-                    f"[final eval] {evaluator.name}: "
-                    + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
-                )
+            # Finish logging
+            if self.logger:
+                self.logger.finish()
 
-        # Save final checkpoint (only if not already saved)
-        if self.config.max_steps % self.config.save_interval != 0:
-            self.save_checkpoint(self.config.max_steps)
-
-        # Finish logging
-        if self.logger:
-            self.logger.finish()
+            # Cleanup resources
+            self.cleanup()
 
     # ========== Checkpointing ==========
 
