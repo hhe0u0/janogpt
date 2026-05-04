@@ -7,9 +7,17 @@ Usage:
     python scripts/train.py --config configs/train_1gpu_a100.json
 """
 
+import os
 import argparse
 import sys
 from pathlib import Path
+
+# Set TPU environment variables before JAX import
+# These need to be set in the training process, not just parent notebook
+if 'TPU_NAME' in os.environ or os.path.exists('/dev/accel0'):
+    os.environ['JAX_PLATFORMS'] = 'tpu'
+    os.environ['TPU_CHIPS_PER_HOST_BOUNDS'] = '2,2,1'
+    os.environ['TPU_HOST_BOUNDS'] = '1,1,1'
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
