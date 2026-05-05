@@ -796,6 +796,10 @@ class Trainer:
             if hasattr(self, 'state'):
                 print("=" * 80)
                 print("Training complete! Running final evaluation...")
+
+                # Clear caches before evaluation to free memory
+                jax.clear_caches()
+
                 if self.evaluators:
                     # Unreplicate state for single-device evaluation
                     eval_state = self.unreplicate(self.state) if self.num_devices > 1 else self.state
