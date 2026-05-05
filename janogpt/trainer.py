@@ -840,12 +840,15 @@ class Trainer:
         """
         Load checkpoint from step (or latest if None).
 
+        Args:
+            step: Step number to load, or None to load latest
+
         Returns:
             step number of loaded checkpoint
         """
         import orbax.checkpoint as ocp
 
-        ckpt_dir = Path(self.config.output_dir).resolve() / "checkpoints"
+        ckpt_dir = Path(self.config.resume_from_checkpoint).resolve()
 
         if step is None:
             # Find latest checkpoint by numeric step value
