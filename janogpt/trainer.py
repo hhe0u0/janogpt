@@ -848,20 +848,34 @@ class Trainer:
         """
         import orbax.checkpoint as ocp
 
-        ckpt_dir = Path(self.config.resume_from_checkpoint).resolve()
+        ckpt_path = Path(self.config.resume_from_checkpoint).resolve()
 
-        if step is None:
-            # Find latest checkpoint by numeric step value
-            checkpoints = list(ckpt_dir.glob("step_*"))
-            if not checkpoints:
-                raise ValueError(f"No checkpoints found in {ckpt_dir}")
-            # Sort by step number (not string name)
-            checkpoints_with_steps = [(int(c.name.split("_")[1]), c) for c in checkpoints]
-            step = max(checkpoints_with_steps)[0]
+        # Handle two cases:
+        # 1. Path is a directory containing step_* folders (e.g., "output/checkpoints")
+        # 2. Path is a specific step folder (e.g., "output/checkpoints/step_100")
+
+        if ckpt_path.name.startswith("step_") and ckpt_path.is_dir():
+            # Case 2: Direct path to step folder
+            step = int(ckpt_path.name.split("_")[1])
+            checkpoint_path = ckpt_path
+        else:
+            # Case 1: Directory containing step folders
+            if step is None:
+                # Find latest checkpoint by numeric step value
+                checkpoints = list(ckpt_path.glob("step_*"))
+                if not checkpoints:
+                    raise ValueError(f"No checkpoints found in {ckpt_path}")
+                # Sort by step number (not string name)
+                checkpoints_with_steps = [(int(c.name.split("_")[1]), c) for c in checkpoints]
+                step = max(checkpoints_with_steps)[0]
+            checkpoint_path = ckpt_path / f"step_{step}"
+
+        if not checkpoint_path.exists():
+            raise ValueError(f"Checkpoint not found: {checkpoint_path}")
 
         # Restore
         checkpointer = ocp.PyTreeCheckpointer()
-        restored = checkpointer.restore(str(ckpt_dir / f"step_{step}"))
+        restored = checkpointer.restore(str(checkpoint_path))
 
         self.state = restored["state"]
         self.rng = restored["rng"]
@@ -870,7 +884,7 @@ class Trainer:
         if self.num_devices > 1:
             self.state = self.replicate(self.state)
 
-        print(f"✓ Checkpoint loaded from step {step}")
+        print(f"✓ Checkpoint loaded from {checkpoint_path}")
         return step
 
     # ========== WandB ==========
