@@ -883,14 +883,19 @@ class Trainer:
 
         if isinstance(loaded_state, dict):
             # Reconstruct TrainState from dict
-            # The dict should have the same structure as TrainState
-            self.state = train_state.TrainState(
-                step=loaded_state["step"],
+            # Note: We recreate opt_state fresh because Orbax restores it as nested dicts
+            # which don't match optax's expected NamedTuple structure.
+            # This means we lose momentum/variance state, but it's safer and model adapts quickly.
+            tx = self.create_optimizer()
+
+            print("Note: Recreating optimizer state (momentum/variance will be reset)")
+            self.state = train_state.TrainState.create(
                 apply_fn=self.model.apply,
                 params=loaded_state["params"],
-                tx=self.create_learning_rate_schedule(),  # Recreate tx (not serializable)
-                opt_state=loaded_state["opt_state"],
+                tx=tx,
             )
+            # Restore the step count
+            self.state = self.state.replace(step=loaded_state["step"])
         else:
             # Already a TrainState object
             self.state = loaded_state
