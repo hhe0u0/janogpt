@@ -4,6 +4,7 @@ Logging and evaluation implementations.
 
 from typing import Any, Callable, Dict
 
+import jax
 import jax.numpy as jnp
 
 from janogpt.protocols import DataLoader
