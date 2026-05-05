@@ -761,10 +761,6 @@ class Trainer:
                         eval_metrics = evaluator.evaluate(eval_state, self.compute_loss, step)
                         if self.logger:
                             self.logger.log(eval_metrics, step=step)
-                        print(
-                            f"[eval  step={step:7d}] {evaluator.name}: "
-                            + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
-                        )
 
                 # Save checkpoint
                 if step % self.config.save_interval == 0:
@@ -809,10 +805,6 @@ class Trainer:
                         )
                         if self.logger:
                             self.logger.log(eval_metrics, step=self.config.max_steps)
-                        print(
-                            f"[final eval] {evaluator.name}: "
-                            + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
-                        )
 
                 # Save final checkpoint (only if not already saved)
                 if self.config.max_steps % self.config.save_interval != 0:
