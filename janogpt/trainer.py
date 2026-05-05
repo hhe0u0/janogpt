@@ -873,9 +873,19 @@ class Trainer:
         if not checkpoint_path.exists():
             raise ValueError(f"Checkpoint not found: {checkpoint_path}")
 
-        # Restore
+        # Create a dummy state structure to guide restoration
+        # This ensures TrainState is properly reconstructed (not just a dict)
+        dummy_state = self.create_train_state()
+
+        # Restore with target structure
         checkpointer = ocp.PyTreeCheckpointer()
-        restored = checkpointer.restore(str(checkpoint_path))
+        target = {
+            "state": dummy_state,
+            "step": 0,
+            "config": {},
+            "rng": self.rng,
+        }
+        restored = checkpointer.restore(str(checkpoint_path), item=target)
 
         self.state = restored["state"]
         self.rng = restored["rng"]
