@@ -755,8 +755,10 @@ class Trainer:
 
                 # Run evaluators
                 if self.evaluators and step % self.config.eval_interval == 0:
+                    # Unreplicate state for single-device evaluation
+                    eval_state = self.unreplicate(self.state) if self.num_devices > 1 else self.state
                     for evaluator in self.evaluators:
-                        eval_metrics = evaluator.evaluate(self.state, self.compute_loss, step)
+                        eval_metrics = evaluator.evaluate(eval_state, self.compute_loss, step)
                         if self.logger:
                             self.logger.log(eval_metrics, step=step)
                         print(
@@ -794,9 +796,11 @@ class Trainer:
             print("=" * 80)
             print("Training complete! Running final evaluation...")
             if self.evaluators:
+                # Unreplicate state for single-device evaluation
+                eval_state = self.unreplicate(self.state) if self.num_devices > 1 else self.state
                 for evaluator in self.evaluators:
                     eval_metrics = evaluator.evaluate(
-                        self.state, self.compute_loss, self.config.max_steps
+                        eval_state, self.compute_loss, self.config.max_steps
                     )
                     if self.logger:
                         self.logger.log(eval_metrics, step=self.config.max_steps)
