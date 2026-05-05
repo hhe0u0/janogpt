@@ -616,21 +616,15 @@ class Trainer:
     def cleanup(self):
         """Cleanup resources (especially TPU)."""
         try:
-            # Clear JAX caches and free TPU memory
+            # Clear JAX caches to free compilation cache memory
             jax.clear_caches()
 
-            # If using TPU, explicitly release resources
-            if jax.devices()[0].platform == 'tpu':
-                print("Releasing TPU resources...")
-                # Delete large objects
-                if hasattr(self, 'state'):
-                    del self.state
-                if hasattr(self, '_train_step_fn'):
-                    del self._train_step_fn
-                # Force garbage collection
-                import gc
-                gc.collect()
-                print("✓ TPU resources released")
+            # Force garbage collection to free unreferenced objects
+            import gc
+            gc.collect()
+
+            # Note: We don't manually delete state or _train_step_fn anymore
+            # as this breaks checkpoint resumption. Python's GC will handle cleanup.
         except Exception as e:
             print(f"Warning: Error during cleanup: {e}")
 
@@ -854,11 +848,13 @@ class Trainer:
         ckpt_dir = Path(self.config.output_dir).resolve() / "checkpoints"
 
         if step is None:
-            # Find latest
-            checkpoints = sorted(ckpt_dir.glob("step_*"))
+            # Find latest checkpoint by numeric step value
+            checkpoints = list(ckpt_dir.glob("step_*"))
             if not checkpoints:
                 raise ValueError(f"No checkpoints found in {ckpt_dir}")
-            step = int(checkpoints[-1].name.split("_")[1])
+            # Sort by step number (not string name)
+            checkpoints_with_steps = [(int(c.name.split("_")[1]), c) for c in checkpoints]
+            step = max(checkpoints_with_steps)[0]
 
         # Restore
         checkpointer = ocp.PyTreeCheckpointer()
