@@ -873,21 +873,30 @@ class Trainer:
         if not checkpoint_path.exists():
             raise ValueError(f"Checkpoint not found: {checkpoint_path}")
 
-        # Create a dummy state structure to guide restoration
-        # This ensures TrainState is properly reconstructed (not just a dict)
-        dummy_state = self.create_train_state()
-
-        # Restore with target structure
+        # Restore checkpoint without requiring exact structure match
         checkpointer = ocp.PyTreeCheckpointer()
-        target = {
-            "state": dummy_state,
-            "step": 0,
-            "config": {},
-            "rng": self.rng,
-        }
-        restored = checkpointer.restore(str(checkpoint_path), item=target)
+        restored = checkpointer.restore(str(checkpoint_path))
 
-        self.state = restored["state"]
+        # The state is already a TrainState if saved properly
+        # But Orbax may return it as a dict - check and handle both cases
+        loaded_state = restored["state"]
+
+        if isinstance(loaded_state, dict):
+            # Reconstruct TrainState from dict
+            # The dict should have the same structure as TrainState
+            self.state = train_state.TrainState(
+                step=loaded_state["step"],
+                apply_fn=self.model.apply,
+                params=loaded_state["params"],
+                tx=self.create_learning_rate_schedule(),  # Recreate tx (not serializable)
+                opt_state=loaded_state["opt_state"],
+            )
+        else:
+            # Already a TrainState object
+            self.state = loaded_state
+            # Update apply_fn to use current model
+            self.state = self.state.replace(apply_fn=self.model.apply)
+
         self.rng = restored["rng"]
 
         # Replicate if multi-device
