@@ -792,26 +792,27 @@ class Trainer:
             self.cleanup()
             raise
         finally:
-            # Final evaluation and checkpoint
-            print("=" * 80)
-            print("Training complete! Running final evaluation...")
-            if self.evaluators:
-                # Unreplicate state for single-device evaluation
-                eval_state = self.unreplicate(self.state) if self.num_devices > 1 else self.state
-                for evaluator in self.evaluators:
-                    eval_metrics = evaluator.evaluate(
-                        eval_state, self.compute_loss, self.config.max_steps
-                    )
-                    if self.logger:
-                        self.logger.log(eval_metrics, step=self.config.max_steps)
-                    print(
-                        f"[final eval] {evaluator.name}: "
-                        + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
-                    )
+            # Final evaluation and checkpoint (only if training started)
+            if hasattr(self, 'state'):
+                print("=" * 80)
+                print("Training complete! Running final evaluation...")
+                if self.evaluators:
+                    # Unreplicate state for single-device evaluation
+                    eval_state = self.unreplicate(self.state) if self.num_devices > 1 else self.state
+                    for evaluator in self.evaluators:
+                        eval_metrics = evaluator.evaluate(
+                            eval_state, self.compute_loss, self.config.max_steps
+                        )
+                        if self.logger:
+                            self.logger.log(eval_metrics, step=self.config.max_steps)
+                        print(
+                            f"[final eval] {evaluator.name}: "
+                            + "  ".join([f"{k}={v:.4f}" for k, v in eval_metrics.items()])
+                        )
 
-            # Save final checkpoint (only if not already saved)
-            if self.config.max_steps % self.config.save_interval != 0:
-                self.save_checkpoint(self.config.max_steps)
+                # Save final checkpoint (only if not already saved)
+                if self.config.max_steps % self.config.save_interval != 0:
+                    self.save_checkpoint(self.config.max_steps)
 
             # Finish logging
             if self.logger:
